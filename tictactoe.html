@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>WebRTC Tic Tac Toe</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 700px;
+            margin: 40px auto;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 5px 0 10px;
+        }
+
+        button {
+            padding: 8px 15px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+
+            gap: 5px;
+
+            margin: 30px auto;
+
+            width: max-content;
+        }
+
+        .cell {
+            width: 100px;
+            height: 100px;
+
+            font-size: 40px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border: 1px solid #333;
+
+            cursor: pointer;
+        }
+
+        .cell:hover {
+            background: #eee;
+        }
+
+        #status {
+            text-align: center;
+            font-size: 20px;
+            margin: 20px;
+        }
+
+        #connectionStatus {
+            padding: 10px;
+            background: #eee;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>WebRTC Tic Tac Toe</h1>
+
+<div id="connectionStatus">
+    Connection: Disconnected
+</div>
+
+
+<!-- =====================================================
+     CONNECTION SETUP
+====================================================== -->
+
+<h2>1. Create Offer</h2>
+
+<button id="createOffer">
+    Create Offer
+</button>
+
+<textarea
+        id="offer"
+        placeholder="Offer will appear here...">
+</textarea>
+
+
+<h2>2. Create Answer</h2>
+
+<textarea
+        id="remoteOffer"
+        placeholder="Paste Offer here...">
+</textarea>
+
+<button id="createAnswer">
+    Create Answer
+</button>
+
+<textarea
+        id="answer"
+        placeholder="Answer will appear here...">
+</textarea>
+
+
+<h2>3. Complete Connection</h2>
+
+<textarea
+        id="remoteAnswer"
+        placeholder="Player A pastes Answer here...">
+</textarea>
+
+<button id="setAnswer">
+    Connect
+</button>
+
+
+<!-- =====================================================
+     GAME
+====================================================== -->
+
+<h2>Game</h2>
+
+<div id="status">
+    Waiting for connection...
+</div>
+
+<div id="board"></div>
+
+<button id="reset">
+    New Game
+</button>
+
+
+<script>
+
+    // =====================================================
+    // WEBRTC
+    // =====================================================
+
+    let peerConnection = null;
+
+    let dataChannel = null;
+
+    // Player identity
+    let mySymbol = null;
+
+    // =====================================================
+    // GAME STATE
+    // =====================================================
+
+    let board = [
+        null, null, null,
+        null, null, null,
+        null, null, null
+    ];
+
+    let currentTurn = "X";
+
+    let gameOver = false;
+
+
+    // =====================================================
+    // DOM
+    // =====================================================
+
+    const offerText =
+        document.getElementById("offer");
+
+    const remoteOfferText =
+        document.getElementById("remoteOffer");
+
+    const answerText =
+        document.getElementById("answer");
+
+    const remoteAnswerText =
+        document.getElementById("remoteAnswer");
+
+    const connectionStatus =
+        document.getElementById("connectionStatus");
+
+    const status =
+        document.getElementById("status");
+
+    const boardElement =
+        document.getElementById("board");
+
+
+    // =====================================================
+    // INITIALIZE BOARD
+    // =====================================================
+
+    function renderBoard() {
+
+        boardElement.innerHTML = "";
+
+        board.forEach((value, index) => {
+
+            const cell =
+                document.createElement("div");
+
+            cell.className = "cell";
+
+            cell.textContent = value || "";
+
+            cell.addEventListener("click", () => {
+                handleMove(index);
+            });
+
+            boardElement.appendChild(cell);
+        });
+
+        updateStatus();
+    }
+
+
+    // =====================================================
+    // GAME STATUS
+    // =====================================================
+
+    function updateStatus() {
+
+        if (!dataChannel ||
+            dataChannel.readyState !== "open") {
+
+            status.textContent =
+                "Not connected";
+
+            return;
+        }
+
+        if (gameOver) {
+            return;
+        }
+
+        if (currentTurn === mySymbol) {
+
+            status.textContent =
+                `Your turn (${mySymbol})`;
+
+        } else {
+
+            status.textContent =
+                `Opponent's turn (${currentTurn})`;
+        }
+    }
+
+
+    // =====================================================
+    // HANDLE PLAYER MOVE
+    // =====================================================
+
+    function handleMove(index) {
+
+        // Không được đánh nếu game chưa connect
+        if (!dataChannel ||
+            dataChannel.readyState !== "open") {
+
+            return;
+        }
+
+        // Game đã kết thúc
+        if (gameOver) {
+            return;
+        }
+
+        // Không phải lượt của mình
+        if (currentTurn !== mySymbol) {
+            return;
+        }
+
+        // Ô đã được đánh
+        if (board[index] !== null) {
+            return;
+        }
+
+        // Thực hiện nước đi local
+        board[index] = mySymbol;
+
+        // Kiểm tra game
+        const result = checkGame();
+
+        if (result) {
+
+            gameOver = true;
+
+            renderBoard();
+
+            sendMessage({
+                type: "GAME_RESULT",
+                result: result,
+                board: board
+            });
+
+            return;
+        }
+
+        // Chuyển lượt
+        currentTurn =
+            mySymbol === "X" ? "O" : "X";
+
+        renderBoard();
+
+        // Gửi nước đi cho opponent
+        sendMessage({
+            type: "MOVE",
+            index: index,
+            symbol: mySymbol
+        });
+    }
+
+
+    // =====================================================
+    // RECEIVE MOVE
+    // =====================================================
+
+    function handleRemoteMove(message) {
+
+        if (gameOver) {
+            return;
+        }
+
+        const {
+            index,
+            symbol
+        } = message;
+
+        // Security / validation
+        if (symbol === mySymbol) {
+            console.error(
+                "Invalid move: opponent used my symbol"
+            );
+
+            return;
+        }
+
+        if (symbol !== currentTurn) {
+            console.error(
+                "Invalid turn"
+            );
+
+            return;
+        }
+
+        if (board[index] !== null) {
+            console.error(
+                "Cell already occupied"
+            );
+
+            return;
+        }
+
+        // Apply opponent move
+        board[index] = symbol;
+
+        // Check game
+        const result = checkGame();
+
+        if (result) {
+
+            gameOver = true;
+
+            renderBoard();
+
+            return;
+        }
+
+        // Switch turn
+        currentTurn =
+            currentTurn === "X"
+                ? "O"
+                : "X";
+
+        renderBoard();
+    }
+
+
+    // =====================================================
+    // CHECK WIN / DRAW
+    // =====================================================
+
+    function checkGame() {
+
+        const winningPatterns = [
+
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+
+            [0, 4, 8],
+            [2, 4, 6]
+        ];
+
+
+        // Check winner
+        for (const pattern
+            of winningPatterns) {
+
+            const [
+                a,
+                b,
+                c
+            ] = pattern;
+
+            if (
+                board[a] &&
+                board[a] === board[b] &&
+                board[a] === board[c]
+            ) {
+
+                return {
+                    type: "WIN",
+                    winner: board[a]
+                };
+            }
+        }
+
+
+        // Check draw
+        if (
+            board.every(cell => cell !== null)
+        ) {
+
+            return {
+                type: "DRAW"
+            };
+        }
+
+
+        return null;
+    }
+
+
+    // =====================================================
+    // SEND MESSAGE
+    // =====================================================
+
+    function sendMessage(message) {
+
+        if (!dataChannel) {
+            return;
+        }
+
+        if (dataChannel.readyState !== "open") {
+            return;
+        }
+
+        dataChannel.send(
+            JSON.stringify(message)
+        );
+    }
+
+
+    // =====================================================
+    // RECEIVE MESSAGE
+    // =====================================================
+
+    function handleMessage(event) {
+
+        const message =
+            JSON.parse(event.data);
+
+        console.log(
+            "Received:",
+            message
+        );
+
+
+        switch (message.type) {
+
+            case "MOVE":
+
+                handleRemoteMove(message);
+
+                break;
+
+
+            case "RESET":
+
+                resetGame(false);
+
+                break;
+
+
+            case "GAME_RESULT":
+
+                gameOver = true;
+
+                board = message.board;
+
+                renderBoard();
+
+                showResult(
+                    message.result
+                );
+
+                break;
+        }
+    }
+
+
+    // =====================================================
+    // SHOW RESULT
+    // =====================================================
+
+    function showResult(result) {
+
+        if (result.type === "DRAW") {
+
+            status.textContent =
+                "Draw!";
+
+            return;
+        }
+
+        if (result.type === "WIN") {
+
+            if (result.winner === mySymbol) {
+
+                status.textContent =
+                    "You win!";
+
+            } else {
+
+                status.textContent =
+                    "You lose!";
+            }
+        }
+    }
+
+
+    // =====================================================
+    // CREATE PEER CONNECTION
+    // =====================================================
+
+    function createPeerConnection() {
+
+        peerConnection =
+            new RTCPeerConnection({
+
+                iceServers: [
+
+                    {
+                        urls:
+                            "stun:stun.l.google.com:19302"
+                    }
+
+                ]
+
+            });
+
+
+        // ICE candidate
+        peerConnection.onicecandidate =
+            event => {
+
+                if (!event.candidate) {
+
+                    console.log(
+                        "ICE gathering complete"
+                    );
+
+                    console.log(
+                        peerConnection.localDescription
+                    );
+                }
+            };
+
+
+        // Connection state
+        peerConnection.onconnectionstatechange =
+            () => {
+
+                console.log(
+                    "Connection state:",
+                    peerConnection.connectionState
+                );
+
+                connectionStatus.textContent =
+                    "Connection: " +
+                    peerConnection.connectionState;
+            };
+
+
+        // Bên Answer nhận DataChannel
+        peerConnection.ondatachannel =
+            event => {
+
+                console.log(
+                    "DataChannel received"
+                );
+
+                dataChannel =
+                    event.channel;
+
+                setupDataChannel();
+            };
+    }
+
+
+    // =====================================================
+    // DATA CHANNEL
+    // =====================================================
+
+    function setupDataChannel() {
+
+        dataChannel.onopen = () => {
+
+            console.log(
+                "DataChannel OPEN"
+            );
+
+            connectionStatus.textContent =
+                "Connection: Connected";
+
+            updateStatus();
+        };
+
+
+        dataChannel.onclose = () => {
+
+            connectionStatus.textContent =
+                "Connection: Closed";
+        };
+
+
+        dataChannel.onerror = error => {
+
+            console.error(
+                "DataChannel error:",
+                error
+            );
+        };
+
+
+        dataChannel.onmessage =
+            handleMessage;
+    }
+
+
+    // =====================================================
+    // PLAYER A
+    // CREATE OFFER
+    // =====================================================
+
+    document
+        .getElementById("createOffer")
+        .addEventListener(
+            "click",
+            async () => {
+
+                mySymbol = "X";
+
+                createPeerConnection();
+
+
+                // A tạo DataChannel
+                dataChannel =
+                    peerConnection
+                        .createDataChannel(
+                            "game"
+                        );
+
+                setupDataChannel();
+
+
+                // Create Offer
+                const offer =
+                    await peerConnection
+                        .createOffer();
+
+
+                await peerConnection
+                    .setLocalDescription(
+                        offer
+                    );
+
+
+                // Chờ ICE gathering hoàn thành
+                await waitForIceGathering();
+
+
+                offerText.value =
+                    JSON.stringify(
+                        peerConnection.localDescription
+                    );
+            }
+        );
+
+
+    // =====================================================
+    // PLAYER B
+    // RECEIVE OFFER + CREATE ANSWER
+    // =====================================================
+
+    document
+        .getElementById("createAnswer")
+        .addEventListener(
+            "click",
+            async () => {
+
+                mySymbol = "O";
+
+                createPeerConnection();
+
+
+                const offer =
+                    JSON.parse(
+                        remoteOfferText.value
+                    );
+
+
+                await peerConnection
+                    .setRemoteDescription(
+                        offer
+                    );
+
+
+                const answer =
+                    await peerConnection
+                        .createAnswer();
+
+
+                await peerConnection
+                    .setLocalDescription(
+                        answer
+                    );
+
+
+                await waitForIceGathering();
+
+
+                answerText.value =
+                    JSON.stringify(
+                        peerConnection.localDescription
+                    );
+            }
+        );
+
+
+    // =====================================================
+    // PLAYER A SET ANSWER
+    // =====================================================
+
+    document
+        .getElementById("setAnswer")
+        .addEventListener(
+            "click",
+            async () => {
+
+                const answer =
+                    JSON.parse(
+                        remoteAnswerText.value
+                    );
+
+
+                await peerConnection
+                    .setRemoteDescription(
+                        answer
+                    );
+
+                console.log(
+                    "Remote answer set"
+                );
+            }
+        );
+
+
+    // =====================================================
+    // WAIT FOR ICE
+    // =====================================================
+
+    function waitForIceGathering() {
+
+        return new Promise(resolve => {
+
+            if (
+                peerConnection
+                    .iceGatheringState ===
+                "complete"
+            ) {
+
+                resolve();
+
+                return;
+            }
+
+
+            const checkState = () => {
+
+                if (
+                    peerConnection
+                        .iceGatheringState ===
+                    "complete"
+                ) {
+
+                    peerConnection
+                        .removeEventListener(
+                            "icegatheringstatechange",
+                            checkState
+                        );
+
+                    resolve();
+                }
+            };
+
+
+            peerConnection
+                .addEventListener(
+                    "icegatheringstatechange",
+                    checkState
+                );
+        });
+    }
+
+
+    // =====================================================
+    // RESET GAME
+    // =====================================================
+
+    document
+        .getElementById("reset")
+        .addEventListener(
+            "click",
+            () => {
+
+                resetGame(true);
+
+                sendMessage({
+                    type: "RESET"
+                });
+            }
+        );
+
+
+    function resetGame(send) {
+
+        board = [
+            null, null, null,
+            null, null, null,
+            null, null, null
+        ];
+
+        currentTurn = "X";
+
+        gameOver = false;
+
+        renderBoard();
+    }
+
+
+    // Initial render
+    renderBoard();
+
+</script>
+
+</body>
+</html>
