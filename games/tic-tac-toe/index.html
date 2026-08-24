@@ -290,11 +290,6 @@
 
                 if (network.isHost) {
 
-                    console.log(
-                        "Host Peer ID:",
-                        idOrRoomCode
-                    );
-
                     roomElement.textContent =
                         idOrRoomCode;
 
@@ -310,13 +305,6 @@
                     statusElement.textContent =
                         "Share the room code: " +
                         idOrRoomCode;
-
-                } else {
-
-                    console.log(
-                        "My peer ID:",
-                        idOrRoomCode
-                    );
                 }
             }
         );
@@ -329,11 +317,6 @@
         network.on(
             "connected",
             () => {
-
-                console.log(
-                    "DataChannel connected"
-                );
-
 
                 connectionElement.textContent =
                     "Connected";
@@ -363,14 +346,7 @@
             "data",
             message => {
 
-                console.log(
-                    "Received:",
-                    message
-                );
-
-
                 handleMessage(message);
-
             }
         );
 

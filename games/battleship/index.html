@@ -423,8 +423,6 @@
 
             if (network.isHost) {
 
-                console.log("Host Peer ID:", idOrRoomCode);
-
                 roomElement.textContent = idOrRoomCode;
                 roomElement.classList.remove("hidden");
 
@@ -432,10 +430,6 @@
 
                 statusElement.textContent =
                     "Share the room code: " + idOrRoomCode;
-
-            } else {
-
-                console.log("My peer ID:", idOrRoomCode);
             }
 
             showGame();
@@ -443,8 +437,6 @@
 
 
         network.on("connected", () => {
-
-            console.log("DataChannel connected");
 
             connectionElement.textContent = "Connected";
 
@@ -455,8 +447,6 @@
 
 
         network.on("data", message => {
-
-            console.log("Received:", message);
 
             handleMessage(message);
         });
