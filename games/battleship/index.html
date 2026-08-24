@@ -148,6 +148,41 @@
             color: #555;
         }
 
+        #helpPanel {
+            max-width: 480px;
+            margin: 15px auto;
+            text-align: left;
+
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        #helpPanel summary {
+            cursor: pointer;
+            font-weight: bold;
+            padding: 10px 14px;
+            user-select: none;
+            text-align: center;
+        }
+
+        #helpPanel summary:hover {
+            background: #f5f5f5;
+        }
+
+        #helpPanel[open] summary {
+            border-bottom: 1px solid #ddd;
+        }
+
+        #helpPanel .collapsible-body {
+            padding: 10px 14px;
+            font-size: 14px;
+            color: #444;
+        }
+
+        #helpPanel .collapsible-body p {
+            margin: 8px 0;
+        }
+
     </style>
 
 </head>
@@ -158,10 +193,25 @@
 
 <h1>WebRTC Battleship</h1>
 
-<p>
-    Fleet: Carrier (5), Battleship (4), Cruiser (3), Submarine (3), Destroyer (2).
-    Sink your opponent's entire fleet to win.
-</p>
+<details id="helpPanel">
+
+    <summary>❓ How to play</summary>
+
+    <div class="collapsible-body">
+
+        <p>
+            Fleet: Carrier (5), Battleship (4), Cruiser (3), Submarine (3), Destroyer (2).
+            Sink your opponent's entire fleet to win.
+        </p>
+
+        <p>
+            During placement, click a cell on your board to place the current
+            ship. Use Rotate to switch between horizontal and vertical.
+        </p>
+
+    </div>
+
+</details>
 
 
 <!-- =====================================================
@@ -184,11 +234,6 @@
     <div id="placement">
 
         <h3 id="placementTitle">Place your fleet</h3>
-
-        <p>
-            Click a cell on your board to place the current ship.
-            Use Rotate to switch between horizontal and vertical.
-        </p>
 
         <div class="controls">
 
