@@ -109,14 +109,6 @@
         Create Game
     </button>
 
-    <br>
-
-    <div id="room"></div>
-
-    <p>
-        Share this room code with your friend
-    </p>
-
     <hr>
 
     <input
@@ -136,6 +128,8 @@
 ====================================================== -->
 
 <div id="game" class="hidden">
+
+    <div id="room" class="hidden"></div>
 
     <div id="connection">
         Connecting...
@@ -303,6 +297,10 @@
 
                     roomElement.textContent =
                         idOrRoomCode;
+
+                    roomElement.classList.remove(
+                        "hidden"
+                    );
 
                     showGame();
 
