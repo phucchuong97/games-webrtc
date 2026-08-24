@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <title>WebRTC Caro</title>
+
+    <!-- PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+
+    <!-- Common networking layer shared by all games in this repo -->
+    <script src="../../common/peer-network.js"></script>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 40px auto;
+            text-align: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        input {
+            padding: 10px;
+            width: 200px;
+        }
+
+        #room {
+            font-size: 30px;
+            font-weight: bold;
+            margin: 20px;
+        }
+
+        #status {
+            margin: 20px;
+            font-size: 20px;
+        }
+
+        #board {
+            display: grid;
+
+            grid-template-columns:
+                repeat(15, 30px);
+
+            grid-template-rows:
+                repeat(15, 30px);
+
+            gap: 1px;
+
+            width: max-content;
+
+            margin: 30px auto;
+        }
+
+        .cell {
+            width: 30px;
+            height: 30px;
+
+            border: 1px solid #333;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 16px;
+            font-weight: bold;
+
+            cursor: pointer;
+        }
+
+        .cell:hover {
+            background: #eee;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #connection {
+            margin: 20px;
+            padding: 10px;
+            background: #eee;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<p><a href="../../index.html">&larr; All games</a></p>
+
+<h1>WebRTC Caro</h1>
+
+<p>15x15 board. First to line up 5 in a row (any direction) wins.</p>
+
+
+<!-- =====================================================
+     LOBBY
+====================================================== -->
+
+<div id="lobby">
+
+    <button id="createGame">
+        Create Game
+    </button>
+
+    <br>
+
+    <div id="room"></div>
+
+    <p>
+        Share this room code with your friend
+    </p>
+
+    <hr>
+
+    <input
+        id="roomInput"
+        placeholder="Enter room code"
+    >
+
+    <button id="joinGame">
+        Join Game
+    </button>
+
+</div>
+
+
+<!-- =====================================================
+     GAME
+====================================================== -->
+
+<div id="game" class="hidden">
+
+    <div id="connection">
+        Connecting...
+    </div>
+
+    <div id="status">
+        Waiting...
+    </div>
+
+    <div id="board"></div>
+
+    <button id="reset">
+        New Game
+    </button>
+
+</div>
+
+
+<script>
+
+    // =====================================================
+    // NETWORK
+    //
+    // Transport (PeerJS host/guest wiring) lives in the shared
+    // common/peer-network.js module. This file only cares about
+    // caro's own message protocol (MOVE / STATE) and rules.
+    // =====================================================
+
+    const network = new PeerNetwork("caro");
+
+
+    // =====================================================
+    // BOARD SIZE / WIN CONDITION
+    // =====================================================
+
+    const BOARD_SIZE = 15;
+
+    const WIN_LENGTH = 5;
+
+
+    // =====================================================
+    // GAME STATE
+    //
+    // IMPORTANT:
+    //
+    // Only HOST owns the authoritative state.
+    //
+    // board is a flat array of BOARD_SIZE * BOARD_SIZE cells,
+    // indexed as row * BOARD_SIZE + col.
+    // =====================================================
+
+    let gameState = {
+
+        board: new Array(BOARD_SIZE * BOARD_SIZE).fill(null),
+
+        currentTurn: "X",
+
+        gameOver: false,
+
+        winner: null
+    };
+
+
+    // =====================================================
+    // DOM
+    // =====================================================
+
+    const lobby =
+        document.getElementById("lobby");
+
+    const game =
+        document.getElementById("game");
+
+    const roomElement =
+        document.getElementById("room");
+
+    const roomInput =
+        document.getElementById("roomInput");
+
+    const statusElement =
+        document.getElementById("status");
+
+    const connectionElement =
+        document.getElementById("connection");
+
+    const boardElement =
+        document.getElementById("board");
+
+
+    // =====================================================
+    // CREATE ROOM
+    // =====================================================
+
+    document
+        .getElementById("createGame")
+        .addEventListener(
+            "click",
+            createGame
+        );
+
+
+    function createGame() {
+
+        setupNetworkEvents();
+
+        /*
+         * network.host() generates the room code and uses it
+         * (namespaced with the "caro-" prefix) as the Peer ID.
+         *
+         * Example:
+         *
+         * caro-ABC123
+         *
+         */
+
+        network.host();
+    }
+
+
+    // =====================================================
+    // JOIN ROOM
+    // =====================================================
+
+    document
+        .getElementById("joinGame")
+        .addEventListener(
+            "click",
+            joinGame
+        );
+
+
+    function joinGame() {
+
+        const roomCode =
+            roomInput.value
+                .trim()
+                .toUpperCase();
+
+
+        if (!roomCode) {
+
+            alert(
+                "Please enter room code"
+            );
+
+            return;
+        }
+
+
+        setupNetworkEvents();
+
+        network.join(roomCode);
+    }
+
+
+    // =====================================================
+    // SETUP NETWORK EVENTS
+    // =====================================================
+
+    function setupNetworkEvents() {
+
+        network.on(
+            "open",
+            idOrRoomCode => {
+
+                if (network.isHost) {
+
+                    console.log(
+                        "Host Peer ID:",
+                        idOrRoomCode
+                    );
+
+                    roomElement.textContent =
+                        idOrRoomCode;
+
+                    showGame();
+
+                    connectionElement.textContent =
+                        "Waiting for opponent...";
+
+                    statusElement.textContent =
+                        "Share the room code: " +
+                        idOrRoomCode;
+
+                } else {
+
+                    console.log(
+                        "My peer ID:",
+                        idOrRoomCode
+                    );
+                }
+            }
+        );
+
+
+        /*
+         * DataChannel connected.
+         */
+
+        network.on(
+            "connected",
+            () => {
+
+                console.log(
+                    "DataChannel connected"
+                );
+
+
+                connectionElement.textContent =
+                    "Connected";
+
+
+                showGame();
+
+
+                if (network.isHost) {
+
+                    /*
+                     * Send initial state.
+                     */
+
+                    sendState();
+                }
+
+            }
+        );
+
+
+        /*
+         * Receive data.
+         */
+
+        network.on(
+            "data",
+            message => {
+
+                console.log(
+                    "Received:",
+                    message
+                );
+
+
+                handleMessage(message);
+
+            }
+        );
+
+
+        /*
+         * Opponent disconnected.
+         */
+
+        network.on(
+            "close",
+            () => {
+
+                connectionElement.textContent =
+                    "Opponent disconnected";
+
+                statusElement.textContent =
+                    "Game ended";
+            }
+        );
+
+
+        network.on(
+            "error",
+            error => {
+
+                console.error(
+                    "Network error:",
+                    error
+                );
+
+                if (network.isHost) {
+
+                    connectionElement.textContent =
+                        "Error: " + error.type;
+
+                } else {
+
+                    alert(
+                        "Connection error: " +
+                        error.type
+                    );
+                }
+            }
+        );
+    }
+
+
+    // =====================================================
+    // HANDLE MESSAGE
+    // =====================================================
+
+    function handleMessage(message) {
+
+
+        // =================================================
+        // GUEST -> HOST
+        //
+        // Guest sends action.
+        // =================================================
+
+        if (
+            network.isHost &&
+            message.type === "MOVE"
+        ) {
+
+            handleGuestMove(
+                message.index
+            );
+
+            return;
+        }
+
+
+        // =================================================
+        // HOST -> GUEST
+        //
+        // Host sends authoritative state.
+        // =================================================
+
+        if (
+            !network.isHost &&
+            message.type === "STATE"
+        ) {
+
+            gameState =
+                message.state;
+
+            render();
+
+            return;
+        }
+
+
+        // =================================================
+        // RESET
+        // =================================================
+
+        if (
+            message.type === "STATE"
+        ) {
+
+            gameState =
+                message.state;
+
+            render();
+        }
+    }
+
+
+    // =====================================================
+    // HANDLE LOCAL MOVE
+    // =====================================================
+
+    function handleLocalMove(index) {
+
+
+        /*
+         * Game hasn't started.
+         */
+
+        if (!network.connection) {
+            return;
+        }
+
+
+        /*
+         * Game over.
+         */
+
+        if (gameState.gameOver) {
+            return;
+        }
+
+
+        /*
+         * Only play during our turn.
+         */
+
+        if (
+            gameState.currentTurn !==
+            getMySymbol()
+        ) {
+
+            return;
+        }
+
+
+        /*
+         * Cell occupied.
+         */
+
+        if (
+            gameState.board[index] !== null
+        ) {
+
+            return;
+        }
+
+
+        // =================================================
+        // HOST
+        // =================================================
+
+        if (network.isHost) {
+
+            /*
+             * Host can directly process move.
+             */
+
+            applyMove(
+                index,
+                "X"
+            );
+
+
+            /*
+             * Broadcast new state.
+             */
+
+            sendState();
+
+
+            return;
+        }
+
+
+        // =================================================
+        // GUEST
+        // =================================================
+
+        /*
+         * Guest does NOT modify state.
+         *
+         * It only sends an ACTION.
+         */
+
+        network.send({
+
+            type: "MOVE",
+
+            index: index
+        });
+    }
+
+
+    // =====================================================
+    // HANDLE GUEST MOVE
+    // =====================================================
+
+    function handleGuestMove(index) {
+
+
+        /*
+         * Guest can only play O.
+         */
+
+        if (
+            gameState.currentTurn !== "O"
+        ) {
+
+            return;
+        }
+
+
+        /*
+         * Validate cell.
+         */
+
+        if (
+            gameState.board[index] !== null
+        ) {
+
+            return;
+        }
+
+
+        /*
+         * Host applies move.
+         */
+
+        applyMove(
+            index,
+            "O"
+        );
+
+
+        /*
+         * Send authoritative state.
+         */
+
+        sendState();
+    }
+
+
+    // =====================================================
+    // APPLY MOVE
+    // =====================================================
+
+    function applyMove(
+        index,
+        symbol
+    ) {
+
+        gameState.board[index] =
+            symbol;
+
+
+        /*
+         * Check winner.
+         */
+
+        const result =
+            checkWinner(index);
+
+
+        if (result) {
+
+            gameState.gameOver = true;
+
+            gameState.winner =
+                result;
+
+            return;
+        }
+
+
+        /*
+         * Switch turn.
+         */
+
+        gameState.currentTurn =
+            symbol === "X"
+                ? "O"
+                : "X";
+    }
+
+
+    // =====================================================
+    // CHECK WINNER
+    //
+    // Only needs to check lines that pass through the cell
+    // that was just played (lastIndex) - a move can only ever
+    // create a new winning line through itself.
+    // =====================================================
+
+    function checkWinner(lastIndex) {
+
+        const row =
+            Math.floor(lastIndex / BOARD_SIZE);
+
+        const col =
+            lastIndex % BOARD_SIZE;
+
+        const symbol =
+            gameState.board[lastIndex];
+
+
+        const directions = [
+            [0, 1],   // horizontal
+            [1, 0],   // vertical
+            [1, 1],   // diagonal ↘
+            [1, -1]   // diagonal ↙
+        ];
+
+
+        for (const [dr, dc] of directions) {
+
+            let count = 1;
+
+
+            /*
+             * Walk forward.
+             */
+
+            for (
+                let step = 1;
+                step < WIN_LENGTH;
+                step++
+            ) {
+
+                if (
+                    getCell(row + dr * step, col + dc * step) !==
+                    symbol
+                ) {
+                    break;
+                }
+
+                count++;
+            }
+
+
+            /*
+             * Walk backward.
+             */
+
+            for (
+                let step = 1;
+                step < WIN_LENGTH;
+                step++
+            ) {
+
+                if (
+                    getCell(row - dr * step, col - dc * step) !==
+                    symbol
+                ) {
+                    break;
+                }
+
+                count++;
+            }
+
+
+            if (count >= WIN_LENGTH) {
+
+                return symbol;
+            }
+        }
+
+
+        /*
+         * Draw.
+         */
+
+        if (
+            gameState.board.every(
+                cell => cell !== null
+            )
+        ) {
+
+            return "DRAW";
+        }
+
+
+        return null;
+    }
+
+
+    function getCell(row, col) {
+
+        if (
+            row < 0 ||
+            row >= BOARD_SIZE ||
+            col < 0 ||
+            col >= BOARD_SIZE
+        ) {
+
+            return null;
+        }
+
+        return gameState.board[
+            row * BOARD_SIZE + col
+        ];
+    }
+
+
+    // =====================================================
+    // SEND STATE
+    // =====================================================
+
+    function sendState() {
+
+        if (
+            !network.connection ||
+            !network.connection.open
+        ) {
+
+            return;
+        }
+
+
+        network.send({
+
+            type: "STATE",
+
+            state: gameState
+
+        });
+
+
+        render();
+    }
+
+
+    // =====================================================
+    // GET SYMBOL
+    // =====================================================
+
+    function getMySymbol() {
+
+        return network.isHost
+            ? "X"
+            : "O";
+    }
+
+
+    // =====================================================
+    // RENDER
+    // =====================================================
+
+    function render() {
+
+        boardElement.innerHTML = "";
+
+
+        gameState.board.forEach(
+            (value, index) => {
+
+                const cell =
+                    document.createElement(
+                        "div"
+                    );
+
+                cell.className =
+                    "cell";
+
+
+                cell.textContent =
+                    value || "";
+
+
+                cell.addEventListener(
+                    "click",
+                    () => {
+
+                        handleLocalMove(
+                            index
+                        );
+
+                    }
+                );
+
+
+                boardElement.appendChild(
+                    cell
+                );
+            }
+        );
+
+
+        updateStatus();
+    }
+
+
+    // =====================================================
+    // STATUS
+    // =====================================================
+
+    function updateStatus() {
+
+        if (!network.connection) {
+
+            statusElement.textContent =
+                "Waiting for opponent...";
+
+            return;
+        }
+
+
+        if (!network.connection.open) {
+
+            statusElement.textContent =
+                "Connecting...";
+
+            return;
+        }
+
+
+        if (gameState.gameOver) {
+
+            if (
+                gameState.winner === "DRAW"
+            ) {
+
+                statusElement.textContent =
+                    "Draw!";
+
+                return;
+            }
+
+
+            if (
+                gameState.winner ===
+                getMySymbol()
+            ) {
+
+                statusElement.textContent =
+                    "You win!";
+
+            } else {
+
+                statusElement.textContent =
+                    "You lose!";
+            }
+
+            return;
+        }
+
+
+        if (
+            gameState.currentTurn ===
+            getMySymbol()
+        ) {
+
+            statusElement.textContent =
+                `Your turn (${getMySymbol()})`;
+
+        } else {
+
+            statusElement.textContent =
+                `Opponent's turn`;
+        }
+    }
+
+
+    // =====================================================
+    // RESET GAME
+    // =====================================================
+
+    document
+        .getElementById("reset")
+        .addEventListener(
+            "click",
+            () => {
+
+                /*
+                 * Only HOST controls reset.
+                 */
+
+                if (!network.isHost) {
+
+                    return;
+                }
+
+
+                gameState = {
+
+                    board: new Array(
+                        BOARD_SIZE * BOARD_SIZE
+                    ).fill(null),
+
+                    currentTurn: "X",
+
+                    gameOver: false,
+
+                    winner: null
+                };
+
+
+                sendState();
+
+            }
+        );
+
+
+    // =====================================================
+    // SHOW GAME
+    // =====================================================
+
+    function showGame() {
+
+        lobby.classList.add(
+            "hidden"
+        );
+
+        game.classList.remove(
+            "hidden"
+        );
+
+        render();
+    }
+
+</script>
+
+</body>
+</html>
