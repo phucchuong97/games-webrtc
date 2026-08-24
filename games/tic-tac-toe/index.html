@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <script>
+        // This game only works embedded in the game-menu shell's
+        // iframe - bounce back to the menu if opened directly.
+        if (window.parent === window) {
+            location.replace("../../index.html");
+        }
+    </script>
+
     <title>WebRTC Tic Tac Toe</title>
 
     <!-- Common networking layer shared by all games in this repo -->
