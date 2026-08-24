@@ -108,6 +108,31 @@
             background: #eee;
         }
 
+        details {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin: 20px auto;
+        }
+
+        details > summary {
+            cursor: pointer;
+            font-weight: bold;
+            padding: 12px;
+            user-select: none;
+        }
+
+        details > summary:hover {
+            background: #f5f5f5;
+        }
+
+        details[open] > summary {
+            border-bottom: 1px solid #ddd;
+        }
+
+        .collapsible-body {
+            padding: 15px;
+        }
+
     </style>
 
 </head>
@@ -125,24 +150,30 @@
      LOBBY
 ====================================================== -->
 
-<div id="lobby">
+<details id="lobby" open>
 
-    <button id="createGame">
-        Create Game
-    </button>
+    <summary>Create / Join Game</summary>
 
-    <hr>
+    <div class="collapsible-body">
 
-    <input
-        id="roomInput"
-        placeholder="Enter room code"
-    >
+        <button id="createGame">
+            Create Game
+        </button>
 
-    <button id="joinGame">
-        Join Game
-    </button>
+        <hr>
 
-</div>
+        <input
+            id="roomInput"
+            placeholder="Enter room code"
+        >
+
+        <button id="joinGame">
+            Join Game
+        </button>
+
+    </div>
+
+</details>
 
 
 <!-- =====================================================
@@ -151,15 +182,25 @@
 
 <div id="game" class="hidden">
 
-    <div id="room" class="hidden"></div>
+    <details id="infoPanel" open>
 
-    <div id="connection">
-        Connecting...
-    </div>
+        <summary>Room &amp; Connection</summary>
 
-    <div id="status">
-        Waiting...
-    </div>
+        <div class="collapsible-body">
+
+            <div id="room" class="hidden"></div>
+
+            <div id="connection">
+                Connecting...
+            </div>
+
+            <div id="status">
+                Waiting...
+            </div>
+
+        </div>
+
+    </details>
 
     <div id="board"></div>
 
