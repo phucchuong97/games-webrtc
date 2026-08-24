@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <title>WebRTC Battleship</title>
+
+    <!-- PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+
+    <!-- Common networking layer shared by all games in this repo -->
+    <script src="../../common/peer-network.js"></script>
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 720px;
+            margin: 40px auto;
+            text-align: center;
+            padding: 0 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            cursor: default;
+            opacity: 0.5;
+        }
+
+        input {
+            padding: 10px;
+            width: 200px;
+        }
+
+        #room {
+            font-size: 30px;
+            font-weight: bold;
+            margin: 20px;
+        }
+
+        #status {
+            margin: 20px;
+            font-size: 20px;
+        }
+
+        #event {
+            min-height: 22px;
+            font-size: 16px;
+            color: #555;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #connection {
+            margin: 20px;
+            padding: 10px;
+            background: #eee;
+        }
+
+        .controls {
+            margin: 15px;
+        }
+
+        .board {
+            display: grid;
+
+            grid-template-columns:
+                repeat(10, 28px);
+
+            grid-template-rows:
+                repeat(10, 28px);
+
+            gap: 1px;
+
+            width: max-content;
+
+            margin: 15px auto;
+        }
+
+        .cell {
+            width: 28px;
+            height: 28px;
+
+            border: 1px solid #333;
+            background: #eaf4fb;
+
+            display: flex;
+
+            justify-content: center;
+            align-items: center;
+
+            font-size: 14px;
+            font-weight: bold;
+
+            cursor: pointer;
+        }
+
+        #ownBoard .cell {
+            cursor: default;
+        }
+
+        .cell.ship {
+            background: #7f8c8d;
+        }
+
+        .cell.hit {
+            background: #e74c3c;
+            color: #fff;
+        }
+
+        .cell.miss {
+            background: #9fb3c8;
+        }
+
+        .cell.preview-valid {
+            background: #b8f0b3 !important;
+        }
+
+        .cell.preview-invalid {
+            background: #f3b3b3 !important;
+        }
+
+        .boards {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 30px;
+        }
+
+        .board-wrap h3 {
+            margin-bottom: 5px;
+        }
+
+        #placementStatus {
+            min-height: 20px;
+            color: #555;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<p><a href="../../index.html">&larr; All games</a></p>
+
+<h1>WebRTC Battleship</h1>
+
+<p>
+    Fleet: Carrier (5), Battleship (4), Cruiser (3), Submarine (3), Destroyer (2).
+    Sink your opponent's entire fleet to win.
+</p>
+
+
+<!-- =====================================================
+     LOBBY
+====================================================== -->
+
+<div id="lobby">
+
+    <button id="createGame">
+        Create Game
+    </button>
+
+    <br>
+
+    <div id="room"></div>
+
+    <p>
+        Share this room code with your friend
+    </p>
+
+    <hr>
+
+    <input
+        id="roomInput"
+        placeholder="Enter room code"
+    >
+
+    <button id="joinGame">
+        Join Game
+    </button>
+
+</div>
+
+
+<!-- =====================================================
+     GAME
+====================================================== -->
+
+<div id="game" class="hidden">
+
+    <div id="connection">
+        Connecting...
+    </div>
+
+    <div id="status">
+        Waiting...
+    </div>
+
+    <div id="event"></div>
+
+
+    <!-- =================================================
+         PLACEMENT
+    ================================================== -->
+
+    <div id="placement">
+
+        <h3 id="placementTitle">Place your fleet</h3>
+
+        <p>
+            Click a cell on your board to place the current ship.
+            Use Rotate to switch between horizontal and vertical.
+        </p>
+
+        <div class="controls">
+
+            <button id="rotateBtn">
+                Rotate (Horizontal)
+            </button>
+
+            <button id="randomizeBtn">
+                Randomize
+            </button>
+
+            <button id="clearBtn">
+                Clear
+            </button>
+
+        </div>
+
+        <div id="placementBoard" class="board"></div>
+
+        <p id="placementStatus"></p>
+
+        <button id="readyBtn" class="hidden">
+            Ready!
+        </button>
+
+    </div>
+
+
+    <!-- =================================================
+         BATTLE
+    ================================================== -->
+
+    <div id="battle" class="hidden">
+
+        <div class="boards">
+
+            <div class="board-wrap">
+                <h3>Your Fleet</h3>
+                <div id="ownBoard" class="board"></div>
+            </div>
+
+            <div class="board-wrap">
+                <h3>Enemy Waters</h3>
+                <div id="enemyBoard" class="board"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <button id="playAgain" class="hidden">
+        Play Again
+    </button>
+
+</div>
+
+
+<script>
+
+    // =====================================================
+    // NETWORK
+    //
+    // Transport (PeerJS host/guest wiring) lives in the shared
+    // common/peer-network.js module. This file only cares about
+    // battleship's own message protocol and rules.
+    //
+    // Unlike tic-tac-toe/caro, there is no single shared
+    // authoritative board here: each player is authoritative over
+    // their OWN fleet (only they know where their ships are), and
+    // only reveals hit/miss results for cells the opponent fires at.
+    // =====================================================
+
+    const network = new PeerNetwork("battleship");
+
+    let connectionOpen = false;
+
+
+    // =====================================================
+    // FLEET / BOARD CONSTANTS
+    // =====================================================
+
+    const BOARD_SIZE = 10;
+
+    const SHIPS = [
+        { name: "Carrier", size: 5 },
+        { name: "Battleship", size: 4 },
+        { name: "Cruiser", size: 3 },
+        { name: "Submarine", size: 3 },
+        { name: "Destroyer", size: 2 }
+    ];
+
+
+    // =====================================================
+    // GAME STATE (local player's view)
+    // =====================================================
+
+    let phase = "PLACEMENT"; // PLACEMENT -> PLAYING -> GAME_OVER
+
+    let localReady = false;
+    let remoteReady = false;
+
+    let currentShipIndex = 0;
+    let orientation = "H";
+
+    let myBoard = new Array(BOARD_SIZE * BOARD_SIZE).fill(null); // shipIndex or null
+    let myShipCells = [];                                        // shipIndex -> [cell indices]
+    let myHits = new Array(BOARD_SIZE * BOARD_SIZE).fill(false); // cells the opponent has fired at
+    let sunkShips = new Array(SHIPS.length).fill(false);
+
+    let opponentHits = new Array(BOARD_SIZE * BOARD_SIZE).fill(null); // null | "HIT" | "MISS"
+
+    let currentTurn = null; // "HOST" | "GUEST"
+    let waitingForResult = false;
+    let winner = null;
+
+
+    // =====================================================
+    // DOM
+    // =====================================================
+
+    const lobby = document.getElementById("lobby");
+    const game = document.getElementById("game");
+
+    const roomElement = document.getElementById("room");
+    const roomInput = document.getElementById("roomInput");
+
+    const statusElement = document.getElementById("status");
+    const connectionElement = document.getElementById("connection");
+    const eventElement = document.getElementById("event");
+
+    const placementElement = document.getElementById("placement");
+    const placementTitleElement = document.getElementById("placementTitle");
+    const placementStatusElement = document.getElementById("placementStatus");
+    const placementBoardElement = document.getElementById("placementBoard");
+
+    const rotateBtn = document.getElementById("rotateBtn");
+    const randomizeBtn = document.getElementById("randomizeBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const readyBtn = document.getElementById("readyBtn");
+
+    const battleElement = document.getElementById("battle");
+    const ownBoardElement = document.getElementById("ownBoard");
+    const enemyBoardElement = document.getElementById("enemyBoard");
+
+    const playAgainBtn = document.getElementById("playAgain");
+
+
+    // =====================================================
+    // ROLE HELPERS
+    // =====================================================
+
+    function myRole() {
+        return network.isHost ? "HOST" : "GUEST";
+    }
+
+    function opponentRole() {
+        return network.isHost ? "GUEST" : "HOST";
+    }
+
+
+    // =====================================================
+    // CREATE / JOIN ROOM
+    // =====================================================
+
+    document.getElementById("createGame")
+        .addEventListener("click", createGame);
+
+    document.getElementById("joinGame")
+        .addEventListener("click", joinGame);
+
+
+    function createGame() {
+
+        setupNetworkEvents();
+
+        network.host();
+    }
+
+
+    function joinGame() {
+
+        const roomCode =
+            roomInput.value.trim().toUpperCase();
+
+        if (!roomCode) {
+
+            alert("Please enter room code");
+
+            return;
+        }
+
+        setupNetworkEvents();
+
+        network.join(roomCode);
+    }
+
+
+    function setupNetworkEvents() {
+
+        /*
+         * Ship placement is entirely local, so both host and guest
+         * can start placing their fleet as soon as their own Peer
+         * is ready - no need to wait for the opponent to connect.
+         */
+
+        network.on("open", idOrRoomCode => {
+
+            if (network.isHost) {
+
+                console.log("Host Peer ID:", idOrRoomCode);
+
+                roomElement.textContent = idOrRoomCode;
+
+                connectionElement.textContent = "Waiting for opponent...";
+
+                statusElement.textContent =
+                    "Share the room code: " + idOrRoomCode;
+
+            } else {
+
+                console.log("My peer ID:", idOrRoomCode);
+            }
+
+            showGame();
+        });
+
+
+        network.on("connected", () => {
+
+            console.log("DataChannel connected");
+
+            connectionElement.textContent = "Connected";
+
+            connectionOpen = true;
+
+            showGame();
+        });
+
+
+        network.on("data", message => {
+
+            console.log("Received:", message);
+
+            handleMessage(message);
+        });
+
+
+        network.on("close", () => {
+
+            connectionElement.textContent = "Opponent disconnected";
+
+            statusElement.textContent = "Game ended";
+        });
+
+
+        network.on("error", error => {
+
+            console.error("Network error:", error);
+
+            if (network.isHost) {
+
+                connectionElement.textContent = "Error: " + error.type;
+
+            } else {
+
+                alert("Connection error: " + error.type);
+            }
+        });
+    }
+
+
+    // =====================================================
+    // HANDLE MESSAGE
+    // =====================================================
+
+    function handleMessage(message) {
+
+        if (message.type === "READY") {
+
+            remoteReady = true;
+
+            maybeStartBattle();
+
+            return;
+        }
+
+        if (message.type === "FIRE") {
+
+            handleIncomingFire(message.index);
+
+            return;
+        }
+
+        if (message.type === "RESULT") {
+
+            handleIncomingResult(message);
+
+            return;
+        }
+
+        if (message.type === "REPLAY") {
+
+            resetGame();
+
+            return;
+        }
+    }
+
+
+    // =====================================================
+    // PLACEMENT
+    // =====================================================
+
+    function shipCellsFor(startIndex, size, orient) {
+
+        const row = Math.floor(startIndex / BOARD_SIZE);
+        const col = startIndex % BOARD_SIZE;
+
+        const cells = [];
+
+        for (let i = 0; i < size; i++) {
+
+            const r = orient === "H" ? row : row + i;
+            const c = orient === "H" ? col + i : col;
+
+            if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE) {
+                return null;
+            }
+
+            cells.push(r * BOARD_SIZE + c);
+        }
+
+        return cells;
+    }
+
+
+    function canPlaceCells(cells) {
+
+        return !!cells && cells.every(i => myBoard[i] === null);
+    }
+
+
+    function placeShip(shipIndex, startIndex, orient) {
+
+        const cells = shipCellsFor(startIndex, SHIPS[shipIndex].size, orient);
+
+        if (!canPlaceCells(cells)) {
+            return false;
+        }
+
+        cells.forEach(i => { myBoard[i] = shipIndex; });
+
+        myShipCells[shipIndex] = cells;
+
+        return true;
+    }
+
+
+    function handlePlacementClick(index) {
+
+        if (localReady || currentShipIndex >= SHIPS.length) {
+            return;
+        }
+
+        const placed = placeShip(currentShipIndex, index, orientation);
+
+        if (!placed) {
+
+            placementStatusElement.textContent =
+                "That ship doesn't fit there - try another cell or rotate.";
+
+            return;
+        }
+
+        placementStatusElement.textContent = "";
+
+        currentShipIndex++;
+
+        renderPlacement();
+    }
+
+
+    function clearPlacement() {
+
+        if (localReady) {
+            return;
+        }
+
+        myBoard.fill(null);
+        myShipCells = [];
+        currentShipIndex = 0;
+
+        placementStatusElement.textContent = "";
+
+        renderPlacement();
+    }
+
+
+    function randomizePlacement() {
+
+        if (localReady) {
+            return;
+        }
+
+        myBoard.fill(null);
+        myShipCells = [];
+
+        SHIPS.forEach((ship, shipIndex) => {
+
+            let placed = false;
+            let attempts = 0;
+
+            while (!placed && attempts < 300) {
+
+                attempts++;
+
+                const orient = Math.random() < 0.5 ? "H" : "V";
+                const startIndex =
+                    Math.floor(Math.random() * BOARD_SIZE * BOARD_SIZE);
+
+                placed = placeShip(shipIndex, startIndex, orient);
+            }
+        });
+
+        currentShipIndex = SHIPS.length;
+
+        placementStatusElement.textContent = "";
+
+        renderPlacement();
+    }
+
+
+    rotateBtn.addEventListener("click", () => {
+
+        if (localReady) {
+            return;
+        }
+
+        orientation = orientation === "H" ? "V" : "H";
+
+        rotateBtn.textContent =
+            "Rotate (" + (orientation === "H" ? "Horizontal" : "Vertical") + ")";
+    });
+
+    randomizeBtn.addEventListener("click", randomizePlacement);
+    clearBtn.addEventListener("click", clearPlacement);
+
+
+    function previewAt(index) {
+
+        if (localReady || currentShipIndex >= SHIPS.length) {
+            return;
+        }
+
+        clearPreview();
+
+        const cells =
+            shipCellsFor(index, SHIPS[currentShipIndex].size, orientation);
+
+        const valid = canPlaceCells(cells);
+
+        (cells || []).forEach(i => {
+
+            placementBoardElement.children[i]
+                .classList.add(valid ? "preview-valid" : "preview-invalid");
+        });
+    }
+
+
+    function clearPreview() {
+
+        placementBoardElement.querySelectorAll(".cell").forEach(cell => {
+
+            cell.classList.remove("preview-valid", "preview-invalid");
+        });
+    }
+
+
+    function renderPlacement() {
+
+        placementBoardElement.innerHTML = "";
+
+        for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+
+            const cell = document.createElement("div");
+
+            cell.className = "cell" + (myBoard[i] !== null ? " ship" : "");
+
+            cell.addEventListener("click", () => handlePlacementClick(i));
+            cell.addEventListener("mouseenter", () => previewAt(i));
+            cell.addEventListener("mouseleave", clearPreview);
+
+            placementBoardElement.appendChild(cell);
+        }
+
+        rotateBtn.disabled = localReady;
+        randomizeBtn.disabled = localReady;
+        clearBtn.disabled = localReady;
+
+        if (currentShipIndex < SHIPS.length) {
+
+            placementTitleElement.textContent =
+                `Place your ${SHIPS[currentShipIndex].name} (${SHIPS[currentShipIndex].size} cells)`;
+
+            readyBtn.classList.add("hidden");
+
+        } else {
+
+            placementTitleElement.textContent = "Fleet ready!";
+
+            if (localReady) {
+
+                readyBtn.classList.add("hidden");
+
+                placementStatusElement.textContent =
+                    "Waiting for opponent to finish placing ships...";
+
+            } else if (!connectionOpen) {
+
+                readyBtn.classList.add("hidden");
+
+                placementStatusElement.textContent =
+                    "Waiting for connection before you can ready up...";
+
+            } else {
+
+                readyBtn.classList.remove("hidden");
+
+                placementStatusElement.textContent = "";
+            }
+        }
+    }
+
+
+    readyBtn.addEventListener("click", () => {
+
+        if (!connectionOpen || localReady || currentShipIndex < SHIPS.length) {
+            return;
+        }
+
+        localReady = true;
+
+        network.send({ type: "READY" });
+
+        renderPlacement();
+        updateStatus();
+
+        maybeStartBattle();
+    });
+
+
+    function maybeStartBattle() {
+
+        if (!localReady || !remoteReady) {
+            return;
+        }
+
+        phase = "PLAYING";
+        currentTurn = "HOST";
+
+        placementElement.classList.add("hidden");
+        battleElement.classList.remove("hidden");
+
+        renderBattle();
+        updateStatus();
+    }
+
+
+    // =====================================================
+    // BATTLE
+    // =====================================================
+
+    function handleIncomingFire(index) {
+
+        if (phase !== "PLAYING" || currentTurn !== opponentRole()) {
+            return;
+        }
+
+        if (myHits[index]) {
+            return;
+        }
+
+        myHits[index] = true;
+
+        const hitShipIndex = myBoard[index];
+        const hit = hitShipIndex !== null;
+
+        let sunkShipName = null;
+
+        if (hit) {
+
+            const cells = myShipCells[hitShipIndex];
+
+            if (cells.every(i => myHits[i])) {
+
+                sunkShips[hitShipIndex] = true;
+                sunkShipName = SHIPS[hitShipIndex].name;
+            }
+        }
+
+        const gameOver = sunkShips.every(Boolean);
+
+        if (gameOver) {
+
+            endGame(opponentRole());
+
+        } else {
+
+            currentTurn = myRole();
+        }
+
+        network.send({
+            type: "RESULT",
+            index,
+            hit,
+            sunkShipName,
+            gameOver,
+            winner: gameOver ? opponentRole() : null
+        });
+
+        renderBattle();
+        updateStatus();
+
+        showEvent(
+            hit
+                ? (sunkShipName ? `Your ${sunkShipName} was sunk!` : "Opponent hit your fleet!")
+                : "Opponent missed."
+        );
+    }
+
+
+    function handleIncomingResult(message) {
+
+        if (!waitingForResult) {
+            return;
+        }
+
+        waitingForResult = false;
+
+        opponentHits[message.index] = message.hit ? "HIT" : "MISS";
+
+        if (message.gameOver) {
+
+            endGame(message.winner);
+
+        } else {
+
+            currentTurn = opponentRole();
+        }
+
+        renderBattle();
+        updateStatus();
+
+        showEvent(
+            message.hit
+                ? (message.sunkShipName ? `You sank their ${message.sunkShipName}!` : "Hit!")
+                : "Miss."
+        );
+    }
+
+
+    function handleEnemyBoardClick(index) {
+
+        if (phase !== "PLAYING" || waitingForResult) {
+            return;
+        }
+
+        if (currentTurn !== myRole()) {
+            return;
+        }
+
+        if (opponentHits[index] !== null) {
+            return;
+        }
+
+        waitingForResult = true;
+
+        network.send({ type: "FIRE", index });
+
+        updateStatus();
+    }
+
+
+    function endGame(winnerRole) {
+
+        phase = "GAME_OVER";
+        winner = winnerRole;
+
+        playAgainBtn.classList.remove("hidden");
+    }
+
+
+    function renderBattle() {
+
+        ownBoardElement.innerHTML = "";
+        enemyBoardElement.innerHTML = "";
+
+        for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+
+            const ownCell = document.createElement("div");
+
+            const isShip = myBoard[i] !== null;
+            const isHit = myHits[i];
+
+            ownCell.className =
+                "cell" +
+                (isShip ? " ship" : "") +
+                (isHit && isShip ? " hit" : "") +
+                (isHit && !isShip ? " miss" : "");
+
+            ownCell.textContent =
+                isHit ? (isShip ? "X" : "•") : "";
+
+            ownBoardElement.appendChild(ownCell);
+
+
+            const enemyCell = document.createElement("div");
+
+            const known = opponentHits[i];
+
+            enemyCell.className =
+                "cell" +
+                (known === "HIT" ? " hit" : "") +
+                (known === "MISS" ? " miss" : "");
+
+            enemyCell.textContent =
+                known === "HIT" ? "X" : known === "MISS" ? "•" : "";
+
+            enemyCell.addEventListener("click", () => handleEnemyBoardClick(i));
+
+            enemyBoardElement.appendChild(enemyCell);
+        }
+    }
+
+
+    // =====================================================
+    // STATUS / EVENTS
+    // =====================================================
+
+    function updateStatus() {
+
+        if (!network.connection) {
+
+            statusElement.textContent = "Waiting for opponent...";
+
+            return;
+        }
+
+        if (!network.connection.open) {
+
+            statusElement.textContent = "Connecting...";
+
+            return;
+        }
+
+        if (phase === "PLACEMENT") {
+
+            statusElement.textContent = localReady
+                ? "Waiting for opponent to finish placing ships..."
+                : "Place your fleet.";
+
+            return;
+        }
+
+        if (phase === "PLAYING") {
+
+            if (waitingForResult) {
+
+                statusElement.textContent = "Firing...";
+
+            } else {
+
+                statusElement.textContent = currentTurn === myRole()
+                    ? "Your turn - fire at the enemy waters!"
+                    : "Opponent's turn...";
+            }
+
+            return;
+        }
+
+        if (phase === "GAME_OVER") {
+
+            statusElement.textContent = winner === myRole()
+                ? "You sank their entire fleet - you win!"
+                : "Your fleet was destroyed - you lose!";
+        }
+    }
+
+
+    function showEvent(text) {
+
+        eventElement.textContent = text;
+    }
+
+
+    // =====================================================
+    // RESET / PLAY AGAIN
+    // =====================================================
+
+    playAgainBtn.addEventListener("click", () => {
+
+        resetGame();
+
+        network.send({ type: "REPLAY" });
+    });
+
+
+    function resetGame() {
+
+        phase = "PLACEMENT";
+
+        localReady = false;
+        remoteReady = false;
+
+        currentShipIndex = 0;
+        orientation = "H";
+
+        myBoard = new Array(BOARD_SIZE * BOARD_SIZE).fill(null);
+        myShipCells = [];
+        myHits = new Array(BOARD_SIZE * BOARD_SIZE).fill(false);
+        sunkShips = new Array(SHIPS.length).fill(false);
+
+        opponentHits = new Array(BOARD_SIZE * BOARD_SIZE).fill(null);
+
+        currentTurn = null;
+        waitingForResult = false;
+        winner = null;
+
+        rotateBtn.textContent = "Rotate (Horizontal)";
+
+        battleElement.classList.add("hidden");
+        placementElement.classList.remove("hidden");
+        playAgainBtn.classList.add("hidden");
+
+        eventElement.textContent = "";
+
+        renderPlacement();
+        updateStatus();
+    }
+
+
+    // =====================================================
+    // SHOW GAME
+    // =====================================================
+
+    function showGame() {
+
+        lobby.classList.add("hidden");
+        game.classList.remove("hidden");
+
+        if (phase === "PLACEMENT") {
+
+            renderPlacement();
+
+        } else {
+
+            renderBattle();
+        }
+
+        updateStatus();
+    }
+
+</script>
+
+</body>
+</html>
