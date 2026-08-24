@@ -90,6 +90,8 @@
         }
 
         .cell {
+            position: relative;
+
             width: var(--cell-size);
             height: var(--cell-size);
 
@@ -105,6 +107,8 @@
             font-weight: bold;
 
             cursor: pointer;
+
+            overflow: hidden;
         }
 
         #ownBoard .cell {
@@ -122,6 +126,73 @@
 
         .cell.miss {
             background: #9fb3c8;
+        }
+
+        .cell.fx-hit::after {
+            content: "💥";
+
+            position: absolute;
+            inset: 0;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            font-size: 1.6em;
+            line-height: 1;
+
+            animation: explode 0.5s ease-out;
+            pointer-events: none;
+        }
+
+        .cell.fx-miss::after {
+            content: "";
+
+            position: absolute;
+            inset: 0;
+
+            border-radius: 50%;
+
+            background: radial-gradient(
+                circle,
+                rgba(255, 255, 255, 0.95) 0%,
+                rgba(159, 179, 200, 0.5) 55%,
+                rgba(159, 179, 200, 0) 75%
+            );
+
+            animation: splash 0.6s ease-out;
+            pointer-events: none;
+        }
+
+        @keyframes explode {
+
+            0% {
+                transform: scale(0.2) rotate(-10deg);
+                opacity: 0;
+            }
+
+            35% {
+                transform: scale(1.4) rotate(5deg);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 0;
+            }
+        }
+
+        @keyframes splash {
+
+            0% {
+                transform: scale(0.1);
+                opacity: 0.9;
+            }
+
+            100% {
+                transform: scale(2.4);
+                opacity: 0;
+            }
         }
 
         .cell.preview-valid {
@@ -792,6 +863,8 @@
         renderBattle();
         updateStatus();
 
+        playHitEffect(ownBoardElement, index, hit);
+
         showEvent(
             hit
                 ? (sunkShipName ? `Your ${sunkShipName} was sunk!` : "Opponent hit your fleet!")
@@ -822,10 +895,42 @@
         renderBattle();
         updateStatus();
 
+        playHitEffect(enemyBoardElement, message.index, message.hit);
+
         showEvent(
             message.hit
                 ? (message.sunkShipName ? `You sank their ${message.sunkShipName}!` : "Hit!")
                 : "Miss."
+        );
+    }
+
+
+    // =====================================================
+    // HIT / MISS VISUAL EFFECTS
+    //
+    // renderBattle() rebuilds every cell from scratch on each update,
+    // so there's no persistent element to animate - instead, grab the
+    // just-rendered cell for the index that changed and play a
+    // one-shot explosion/splash overlay on it (removed once the CSS
+    // animation ends, leaving the plain hit/miss styling behind).
+    // =====================================================
+
+    function playHitEffect(boardElement, index, hit) {
+
+        const cell = boardElement.children[index];
+
+        if (!cell) {
+            return;
+        }
+
+        const effectClass = hit ? "fx-hit" : "fx-miss";
+
+        cell.classList.add(effectClass);
+
+        cell.addEventListener(
+            "animationend",
+            () => cell.classList.remove(effectClass),
+            { once: true }
         );
     }
 
