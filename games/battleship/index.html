@@ -6,11 +6,7 @@
 
     <title>WebRTC Battleship</title>
 
-    <!-- PeerJS -->
-    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
-
     <!-- Common networking layer shared by all games in this repo -->
-    <script src="../../common/peer-network.js"></script>
     <script src="../../common/network-bridge.js"></script>
 
     <style>
@@ -47,17 +43,6 @@
         button:disabled {
             cursor: default;
             opacity: 0.5;
-        }
-
-        input {
-            padding: 10px;
-            width: 200px;
-        }
-
-        #room {
-            font-size: 30px;
-            font-weight: bold;
-            margin: 20px;
         }
 
         #status {
@@ -203,36 +188,6 @@
 
 
 <!-- =====================================================
-     LOBBY
-====================================================== -->
-
-<details id="lobby" open>
-
-    <summary>Create / Join Game</summary>
-
-    <div class="collapsible-body">
-
-        <button id="createGame">
-            Create Game
-        </button>
-
-        <hr>
-
-        <input
-            id="roomInput"
-            placeholder="Enter room code"
-        >
-
-        <button id="joinGame">
-            Join Game
-        </button>
-
-    </div>
-
-</details>
-
-
-<!-- =====================================================
      GAME
 ====================================================== -->
 
@@ -243,8 +198,6 @@
         <summary>Room &amp; Connection</summary>
 
         <div class="collapsible-body">
-
-            <div id="room" class="hidden"></div>
 
             <div id="connection">
                 Connecting...
@@ -335,27 +288,18 @@
     // =====================================================
     // NETWORK
     //
-    // Transport (PeerJS host/guest wiring) lives in the shared
-    // common/peer-network.js module. This file only cares about
-    // battleship's own message protocol and rules.
+    // This game only runs embedded in the game-menu shell's iframe.
+    // The shell owns the single real PeerJS connection; this file
+    // talks to it through common/network-bridge.js and only cares
+    // about battleship's own message protocol and rules.
     //
     // Unlike tic-tac-toe/caro, there is no single shared
     // authoritative board here: each player is authoritative over
     // their OWN fleet (only they know where their ships are), and
     // only reveals hit/miss results for cells the opponent fires at.
-    //
-    // When opened inside the game-menu shell's iframe, reuse the
-    // shell's already-established connection (common/network-bridge.js)
-    // instead of creating a new PeerJS connection of our own - that's
-    // what lets players switch games without reconnecting. Opened
-    // directly (not embedded), this game still works standalone.
     // =====================================================
 
-    const embedded = window.parent !== window;
-
-    const network = embedded
-        ? new NetworkBridge()
-        : new PeerNetwork("battleship");
+    const network = new NetworkBridge();
 
     let connectionOpen = false;
 
@@ -403,11 +347,7 @@
     // DOM
     // =====================================================
 
-    const lobby = document.getElementById("lobby");
     const game = document.getElementById("game");
-
-    const roomElement = document.getElementById("room");
-    const roomInput = document.getElementById("roomInput");
 
     const statusElement = document.getElementById("status");
     const connectionElement = document.getElementById("connection");
@@ -444,92 +384,25 @@
 
 
     // =====================================================
-    // EMBEDDED VS STANDALONE STARTUP
+    // STARTUP
+    //
+    // This game only ever runs embedded in the game-menu shell's
+    // iframe - the shell owns the real connection and this bridges
+    // to it (see common/network-bridge.js).
     // =====================================================
 
-    if (embedded) {
+    setupNetworkEvents();
 
-        /*
-         * Connection already exists at the shell level - skip the
-         * lobby entirely and wire straight into it.
-         */
+    document.getElementById("backLink")
+        .addEventListener("click", event => {
 
-        lobby.classList.add("hidden");
+            event.preventDefault();
 
-        setupNetworkEvents();
-
-        document.getElementById("backLink")
-            .addEventListener("click", event => {
-
-                event.preventDefault();
-
-                network.leaveToMenu();
-            });
-
-    } else {
-
-        document.getElementById("createGame")
-            .addEventListener("click", createGame);
-
-        document.getElementById("joinGame")
-            .addEventListener("click", joinGame);
-    }
-
-
-    // =====================================================
-    // CREATE / JOIN ROOM
-    // =====================================================
-
-    function createGame() {
-
-        setupNetworkEvents();
-
-        network.host();
-    }
-
-
-    function joinGame() {
-
-        const roomCode =
-            roomInput.value.trim().toUpperCase();
-
-        if (!roomCode) {
-
-            alert("Please enter room code");
-
-            return;
-        }
-
-        setupNetworkEvents();
-
-        network.join(roomCode);
-    }
+            network.leaveToMenu();
+        });
 
 
     function setupNetworkEvents() {
-
-        /*
-         * Ship placement is entirely local, so both host and guest
-         * can start placing their fleet as soon as their own Peer
-         * is ready - no need to wait for the opponent to connect.
-         */
-
-        network.on("open", idOrRoomCode => {
-
-            if (network.isHost) {
-
-                roomElement.textContent = idOrRoomCode;
-                roomElement.classList.remove("hidden");
-
-                connectionElement.textContent = "Waiting for opponent...";
-
-                statusElement.textContent =
-                    "Share the room code: " + idOrRoomCode;
-            }
-
-            showGame();
-        });
-
 
         network.on("connected", () => {
 
@@ -1147,7 +1020,6 @@
 
     function showGame() {
 
-        lobby.classList.add("hidden");
         game.classList.remove("hidden");
 
         if (phase === "PLACEMENT") {
