@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>WebRTC Caro</title>
 
@@ -14,11 +15,27 @@
 
     <style>
 
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --cell-size: clamp(16px, 6vw, 30px);
+        }
+
         body {
             font-family: Arial, sans-serif;
             max-width: 600px;
             margin: 40px auto;
+            padding: 0 16px;
             text-align: center;
+        }
+
+        @media (max-width: 480px) {
+
+            body {
+                margin: 20px auto;
+            }
         }
 
         button {
@@ -47,21 +64,22 @@
             display: grid;
 
             grid-template-columns:
-                repeat(15, 30px);
+                repeat(15, var(--cell-size));
 
             grid-template-rows:
-                repeat(15, 30px);
+                repeat(15, var(--cell-size));
 
             gap: 1px;
 
             width: max-content;
+            max-width: 100%;
 
             margin: 30px auto;
         }
 
         .cell {
-            width: 30px;
-            height: 30px;
+            width: var(--cell-size);
+            height: var(--cell-size);
 
             border: 1px solid #333;
 
@@ -70,7 +88,7 @@
             justify-content: center;
             align-items: center;
 
-            font-size: 16px;
+            font-size: clamp(10px, 3vw, 16px);
             font-weight: bold;
 
             cursor: pointer;

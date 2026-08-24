@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>WebRTC Battleship</title>
 
@@ -14,12 +15,27 @@
 
     <style>
 
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --cell-size: clamp(22px, 7.5vw, 28px);
+        }
+
         body {
             font-family: Arial, sans-serif;
             max-width: 720px;
             margin: 40px auto;
             text-align: center;
-            padding: 0 20px;
+            padding: 0 16px;
+        }
+
+        @media (max-width: 480px) {
+
+            body {
+                margin: 20px auto;
+            }
         }
 
         button {
@@ -73,21 +89,22 @@
             display: grid;
 
             grid-template-columns:
-                repeat(10, 28px);
+                repeat(10, var(--cell-size));
 
             grid-template-rows:
-                repeat(10, 28px);
+                repeat(10, var(--cell-size));
 
             gap: 1px;
 
             width: max-content;
+            max-width: 100%;
 
             margin: 15px auto;
         }
 
         .cell {
-            width: 28px;
-            height: 28px;
+            width: var(--cell-size);
+            height: var(--cell-size);
 
             border: 1px solid #333;
             background: #eaf4fb;
@@ -97,7 +114,7 @@
             justify-content: center;
             align-items: center;
 
-            font-size: 14px;
+            font-size: clamp(11px, 3.5vw, 14px);
             font-weight: bold;
 
             cursor: pointer;
@@ -132,7 +149,7 @@
             display: flex;
             justify-content: center;
             flex-wrap: wrap;
-            gap: 30px;
+            gap: clamp(12px, 4vw, 30px);
         }
 
         .board-wrap h3 {

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>WebRTC Tic Tac Toe</title>
 
@@ -14,11 +15,27 @@
 
     <style>
 
+        * {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --cell-size: clamp(70px, 26vw, 100px);
+        }
+
         body {
             font-family: Arial, sans-serif;
             max-width: 600px;
             margin: 40px auto;
+            padding: 0 16px;
             text-align: center;
+        }
+
+        @media (max-width: 480px) {
+
+            body {
+                margin: 20px auto;
+            }
         }
 
         button {
@@ -47,10 +64,10 @@
             display: grid;
 
             grid-template-columns:
-                repeat(3, 100px);
+                repeat(3, var(--cell-size));
 
             grid-template-rows:
-                repeat(3, 100px);
+                repeat(3, var(--cell-size));
 
             gap: 5px;
 
@@ -60,8 +77,8 @@
         }
 
         .cell {
-            width: 100px;
-            height: 100px;
+            width: var(--cell-size);
+            height: var(--cell-size);
 
             border: 1px solid #333;
 
@@ -70,7 +87,7 @@
             justify-content: center;
             align-items: center;
 
-            font-size: 50px;
+            font-size: clamp(28px, 10vw, 50px);
 
             cursor: pointer;
         }
