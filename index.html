@@ -5,14 +5,52 @@
 
     <title>WebRTC Games</title>
 
+    <!-- PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+
+    <!-- Common networking layer shared by all games in this repo -->
+    <script src="common/peer-network.js"></script>
+
     <style>
 
         body {
             font-family: Arial, sans-serif;
-            max-width: 900px;
+            max-width: 850px;
             margin: 40px auto;
             text-align: center;
             padding: 0 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
+        input {
+            padding: 10px;
+            width: 200px;
+        }
+
+        #room {
+            font-size: 30px;
+            font-weight: bold;
+            margin: 20px;
+        }
+
+        #status {
+            margin: 20px;
+            font-size: 20px;
+        }
+
+        #connection {
+            margin: 20px;
+            padding: 10px;
+            background: #eee;
+        }
+
+        .hidden {
+            display: none;
         }
 
         #games {
@@ -39,7 +77,8 @@
             border: 1px solid #333;
             border-radius: 8px;
 
-            text-decoration: none;
+            background: none;
+            font: inherit;
             color: inherit;
 
             transition: background 0.15s ease;
@@ -58,6 +97,16 @@
             font-weight: bold;
         }
 
+        #gameFrame {
+            width: 100%;
+            height: 820px;
+
+            border: 1px solid #ccc;
+            border-radius: 8px;
+
+            margin-top: 20px;
+        }
+
     </style>
 
 </head>
@@ -66,11 +115,73 @@
 
 <h1>WebRTC Games</h1>
 
-<p>Pick a game. Create a room, share the code with a friend, and play peer-to-peer.</p>
+<p>
+    Connect with a friend once, then switch between games together
+    without reconnecting.
+</p>
 
-<div id="games"></div>
+
+<!-- =====================================================
+     LOBBY
+====================================================== -->
+
+<div id="lobby">
+
+    <button id="createGame">
+        Create Game
+    </button>
+
+    <hr>
+
+    <input
+        id="roomInput"
+        placeholder="Enter room code"
+    >
+
+    <button id="joinGame">
+        Join Game
+    </button>
+
+</div>
+
+
+<!-- =====================================================
+     MENU (shown once connected)
+====================================================== -->
+
+<div id="menu" class="hidden">
+
+    <div id="room" class="hidden"></div>
+
+    <div id="connection">
+        Connecting...
+    </div>
+
+    <div id="status">
+        Waiting...
+    </div>
+
+    <div id="games"></div>
+
+    <iframe id="gameFrame" class="hidden"></iframe>
+
+</div>
+
 
 <script>
+
+    // =====================================================
+    // NETWORK
+    //
+    // The shell owns the single, real PeerJS connection. Once
+    // connected, individual games are loaded into an iframe and talk
+    // to this same connection through common/network-bridge.js
+    // (postMessage relay) instead of creating their own - that's what
+    // lets players switch games without reconnecting.
+    // =====================================================
+
+    const network = new PeerNetwork("shell");
+
 
     // =====================================================
     // GAME LIST
@@ -98,26 +209,255 @@
 
 
     // =====================================================
-    // RENDER GRID
+    // DOM
     // =====================================================
 
-    const gamesElement =
-        document.getElementById("games");
+    const lobby = document.getElementById("lobby");
+    const menu = document.getElementById("menu");
+
+    const roomElement = document.getElementById("room");
+    const roomInput = document.getElementById("roomInput");
+
+    const statusElement = document.getElementById("status");
+    const connectionElement = document.getElementById("connection");
+
+    const gamesElement = document.getElementById("games");
+    const gameFrame = document.getElementById("gameFrame");
+
+
+    // =====================================================
+    // RENDER GAME GRID
+    // =====================================================
 
     games.forEach(game => {
 
-        const card =
-            document.createElement("a");
+        const card = document.createElement("button");
 
         card.className = "game-card";
-        card.href = game.path;
 
         card.innerHTML = `
             <div class="game-icon">${game.icon}</div>
             <div class="game-name">${game.name}</div>
         `;
 
+        card.addEventListener("click", () => selectGame(game.path));
+
         gamesElement.appendChild(card);
+    });
+
+
+    // =====================================================
+    // CREATE / JOIN ROOM
+    // =====================================================
+
+    document.getElementById("createGame")
+        .addEventListener("click", createGame);
+
+    document.getElementById("joinGame")
+        .addEventListener("click", joinGame);
+
+
+    function createGame() {
+
+        setupNetworkEvents();
+
+        network.host();
+    }
+
+
+    function joinGame() {
+
+        const roomCode =
+            roomInput.value.trim().toUpperCase();
+
+        if (!roomCode) {
+
+            alert("Please enter room code");
+
+            return;
+        }
+
+        setupNetworkEvents();
+
+        network.join(roomCode);
+    }
+
+
+    function setupNetworkEvents() {
+
+        network.on("open", idOrRoomCode => {
+
+            if (network.isHost) {
+
+                roomElement.textContent = idOrRoomCode;
+                roomElement.classList.remove("hidden");
+
+                showMenu();
+
+                connectionElement.textContent = "Waiting for opponent...";
+
+                statusElement.textContent =
+                    "Share the room code: " + idOrRoomCode;
+            }
+        });
+
+
+        network.on("connected", () => {
+
+            connectionElement.textContent = "Connected";
+
+            statusElement.textContent = "Pick a game to play together.";
+
+            showMenu();
+        });
+
+
+        network.on("data", message => {
+
+            handleMessage(message);
+        });
+
+
+        network.on("close", () => {
+
+            connectionElement.textContent = "Opponent disconnected";
+
+            statusElement.textContent = "";
+
+            relayToFrame({ source: "shell", type: "close" });
+        });
+
+
+        network.on("error", error => {
+
+            console.error("Network error:", error);
+
+            if (network.isHost) {
+
+                connectionElement.textContent = "Error: " + error.type;
+
+            } else {
+
+                alert("Connection error: " + error.type);
+            }
+        });
+    }
+
+
+    function showMenu() {
+
+        lobby.classList.add("hidden");
+        menu.classList.remove("hidden");
+    }
+
+
+    // =====================================================
+    // GAME SELECTION
+    //
+    // Either player can pick a game or head back to the menu; the
+    // choice is broadcast to the other side so both switch together.
+    // =====================================================
+
+    function selectGame(path, notifyPeer = true) {
+
+        gamesElement.classList.add("hidden");
+
+        gameFrame.src = path;
+        gameFrame.classList.remove("hidden");
+
+        if (notifyPeer) {
+
+            network.send({ __shell: "SELECT_GAME", game: path });
+        }
+    }
+
+
+    function backToMenu(notifyPeer = true) {
+
+        gameFrame.classList.add("hidden");
+        gameFrame.src = "about:blank";
+
+        gamesElement.classList.remove("hidden");
+
+        if (notifyPeer) {
+
+            network.send({ __shell: "BACK_TO_MENU" });
+        }
+    }
+
+
+    function handleMessage(message) {
+
+        if (message.__shell === "SELECT_GAME") {
+
+            selectGame(message.game, false);
+
+            return;
+        }
+
+        if (message.__shell === "BACK_TO_MENU") {
+
+            backToMenu(false);
+
+            return;
+        }
+
+        /*
+         * Not a shell control message - it belongs to whichever game
+         * is currently loaded in the iframe.
+         */
+
+        relayToFrame({ source: "shell", type: "data", payload: message });
+    }
+
+
+    function relayToFrame(message) {
+
+        if (!gameFrame.contentWindow) {
+            return;
+        }
+
+        gameFrame.contentWindow.postMessage(message, "*");
+    }
+
+
+    // =====================================================
+    // BRIDGE MESSAGES FROM THE EMBEDDED GAME
+    // =====================================================
+
+    window.addEventListener("message", event => {
+
+        if (event.source !== gameFrame.contentWindow) {
+            return;
+        }
+
+        const message = event.data;
+
+        if (!message || message.source !== "bridge") {
+            return;
+        }
+
+        if (message.type === "ready") {
+
+            gameFrame.contentWindow.postMessage(
+                { source: "shell", type: "init", isHost: network.isHost },
+                "*"
+            );
+
+            return;
+        }
+
+        if (message.type === "send") {
+
+            network.send(message.payload);
+
+            return;
+        }
+
+        if (message.type === "leave") {
+
+            backToMenu();
+        }
     });
 
 </script>

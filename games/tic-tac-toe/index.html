@@ -10,6 +10,7 @@
 
     <!-- Common networking layer shared by all games in this repo -->
     <script src="../../common/peer-network.js"></script>
+    <script src="../../common/network-bridge.js"></script>
 
     <style>
 
@@ -94,7 +95,7 @@
 
 <body>
 
-<p><a href="../../index.html">&larr; All games</a></p>
+<p><a id="backLink" href="../../index.html">&larr; All games</a></p>
 
 <h1>WebRTC Tic Tac Toe</h1>
 
@@ -156,9 +157,19 @@
     // Transport (PeerJS host/guest wiring) lives in the shared
     // common/peer-network.js module. This file only cares about
     // tic-tac-toe's own message protocol (MOVE / STATE) and rules.
+    //
+    // When opened inside the game-menu shell's iframe, reuse the
+    // shell's already-established connection (common/network-bridge.js)
+    // instead of creating a new PeerJS connection of our own - that's
+    // what lets players switch games without reconnecting. Opened
+    // directly (not embedded), this game still works standalone.
     // =====================================================
 
-    const network = new PeerNetwork("ttt");
+    const embedded = window.parent !== window;
+
+    const network = embedded
+        ? new NetworkBridge()
+        : new PeerNetwork("ttt");
 
 
     // =====================================================
@@ -213,16 +224,44 @@
 
 
     // =====================================================
-    // CREATE ROOM
+    // EMBEDDED VS STANDALONE STARTUP
     // =====================================================
 
-    document
-        .getElementById("createGame")
-        .addEventListener(
-            "click",
-            createGame
-        );
+    if (embedded) {
 
+        /*
+         * Connection already exists at the shell level - skip the
+         * lobby entirely and wire straight into it.
+         */
+
+        lobby.classList.add("hidden");
+
+        setupNetworkEvents();
+
+        document
+            .getElementById("backLink")
+            .addEventListener("click", event => {
+
+                event.preventDefault();
+
+                network.leaveToMenu();
+            });
+
+    } else {
+
+        document
+            .getElementById("createGame")
+            .addEventListener("click", createGame);
+
+        document
+            .getElementById("joinGame")
+            .addEventListener("click", joinGame);
+    }
+
+
+    // =====================================================
+    // CREATE ROOM
+    // =====================================================
 
     function createGame() {
 
@@ -245,14 +284,6 @@
     // =====================================================
     // JOIN ROOM
     // =====================================================
-
-    document
-        .getElementById("joinGame")
-        .addEventListener(
-            "click",
-            joinGame
-        );
-
 
     function joinGame() {
 
