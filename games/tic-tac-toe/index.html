@@ -93,37 +93,6 @@
             display: none;
         }
 
-        #connection {
-            margin: 20px;
-            padding: 10px;
-            background: #eee;
-        }
-
-        details {
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            margin: 20px auto;
-        }
-
-        details > summary {
-            cursor: pointer;
-            font-weight: bold;
-            padding: 12px;
-            user-select: none;
-        }
-
-        details > summary:hover {
-            background: #f5f5f5;
-        }
-
-        details[open] > summary {
-            border-bottom: 1px solid #ddd;
-        }
-
-        .collapsible-body {
-            padding: 15px;
-        }
-
     </style>
 
 </head>
@@ -141,23 +110,9 @@
 
 <div id="game" class="hidden">
 
-    <details id="infoPanel" open>
-
-        <summary>Room &amp; Connection</summary>
-
-        <div class="collapsible-body">
-
-            <div id="connection">
-                Connecting...
-            </div>
-
-            <div id="status">
-                Waiting...
-            </div>
-
-        </div>
-
-    </details>
+    <div id="status">
+        Waiting...
+    </div>
 
     <div id="board"></div>
 
@@ -218,9 +173,6 @@
     const statusElement =
         document.getElementById("status");
 
-    const connectionElement =
-        document.getElementById("connection");
-
     const boardElement =
         document.getElementById("board");
 
@@ -259,10 +211,6 @@
             "connected",
             () => {
 
-                connectionElement.textContent =
-                    "Connected";
-
-
                 showGame();
 
 
@@ -300,11 +248,8 @@
             "close",
             () => {
 
-                connectionElement.textContent =
-                    "Opponent disconnected";
-
                 statusElement.textContent =
-                    "Game ended";
+                    "Opponent disconnected - game ended.";
             }
         );
 
@@ -318,18 +263,8 @@
                     error
                 );
 
-                if (network.isHost) {
-
-                    connectionElement.textContent =
-                        "Error: " + error.type;
-
-                } else {
-
-                    alert(
-                        "Connection error: " +
-                        error.type
-                    );
-                }
+                statusElement.textContent =
+                    "Connection error: " + error.type;
             }
         );
     }
