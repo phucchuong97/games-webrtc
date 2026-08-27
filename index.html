@@ -18,6 +18,10 @@
     <!-- PeerJS -->
     <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
 
+    <!-- QR code generation (room code -> QR) and scanning (camera -> room code) -->
+    <script src="https://unpkg.com/qrcode@1.4.4/build/qrcode.min.js"></script>
+    <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+
     <!-- Common networking layer shared by all games in this repo -->
     <script src="common/peer-network.js"></script>
 
@@ -57,6 +61,48 @@
             font-size: 30px;
             font-weight: bold;
             margin: 20px;
+        }
+
+        #roomQr {
+            display: block;
+            margin: 0 auto 20px;
+            border-radius: 8px;
+        }
+
+        #scannerOverlay {
+            position: fixed;
+            inset: 0;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            background: rgba(0, 0, 0, 0.85);
+
+            z-index: 1000;
+        }
+
+        #scannerOverlay.hidden {
+            display: none;
+        }
+
+        .scanner-box {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 90vw;
+            text-align: center;
+        }
+
+        #scannerVideo {
+            width: 100%;
+            max-width: 320px;
+            border-radius: 8px;
+            background: #000;
+        }
+
+        #scannerHint {
+            margin: 15px 0 5px;
         }
 
         #status {
@@ -199,9 +245,36 @@
             Join Game
         </button>
 
+        <button id="scanQr">
+            📷 Scan QR
+        </button>
+
     </div>
 
 </details>
+
+
+<!-- =====================================================
+     QR SCANNER OVERLAY
+====================================================== -->
+
+<div id="scannerOverlay" class="hidden">
+
+    <div class="scanner-box">
+
+        <video id="scannerVideo" playsinline muted></video>
+
+        <p id="scannerHint">
+            Point the camera at your friend's QR code
+        </p>
+
+        <button id="scannerCancel">
+            Cancel
+        </button>
+
+    </div>
+
+</div>
 
 
 <!-- =====================================================
@@ -217,6 +290,8 @@
         <div class="collapsible-body">
 
             <div id="room" class="hidden"></div>
+
+            <canvas id="roomQr" class="hidden"></canvas>
 
             <div id="connection">
                 Connecting...
@@ -260,11 +335,6 @@
 
     const games = [
         {
-            name: "Tic Tac Toe",
-            icon: "❌⭕",
-            path: "games/tic-tac-toe/index.html"
-        },
-        {
             name: "Caro",
             icon: "🔵🔴",
             path: "games/caro/index.html"
@@ -285,6 +355,7 @@
     const menu = document.getElementById("menu");
 
     const roomElement = document.getElementById("room");
+    const roomQrElement = document.getElementById("roomQr");
     const roomInput = document.getElementById("roomInput");
 
     const statusElement = document.getElementById("status");
@@ -292,6 +363,9 @@
 
     const gamesElement = document.getElementById("games");
     const gameFrame = document.getElementById("gameFrame");
+
+    const scannerOverlay = document.getElementById("scannerOverlay");
+    const scannerVideo = document.getElementById("scannerVideo");
 
 
     // =====================================================
@@ -324,6 +398,12 @@
 
     document.getElementById("joinGame")
         .addEventListener("click", joinGame);
+
+    document.getElementById("scanQr")
+        .addEventListener("click", startScanner);
+
+    document.getElementById("scannerCancel")
+        .addEventListener("click", stopScanner);
 
 
     function createGame() {
@@ -360,6 +440,8 @@
 
                 roomElement.textContent = idOrRoomCode;
                 roomElement.classList.remove("hidden");
+
+                renderRoomQr(idOrRoomCode);
 
                 showMenu();
 
@@ -417,6 +499,118 @@
 
         lobby.classList.add("hidden");
         menu.classList.remove("hidden");
+    }
+
+
+    // =====================================================
+    // QR CODE SHARE / SCAN
+    //
+    // Lets a host share their room code as a QR code instead of reading
+    // it out, and a guest scan it with the camera instead of typing it.
+    // =====================================================
+
+    function renderRoomQr(roomCode) {
+
+        QRCode.toCanvas(roomQrElement, roomCode, { width: 180, margin: 1 }, error => {
+
+            if (error) {
+
+                console.error("QR generation failed:", error);
+                return;
+            }
+
+            roomQrElement.classList.remove("hidden");
+        });
+    }
+
+
+    let scannerStream = null;
+    let scannerFrameRequest = null;
+
+    const scannerCanvas = document.createElement("canvas");
+    const scannerContext = scannerCanvas.getContext("2d");
+
+
+    async function startScanner() {
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+
+            alert("Camera access isn't supported in this browser.");
+            return;
+        }
+
+        try {
+
+            scannerStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" }
+            });
+
+        } catch (error) {
+
+            console.error("Camera access failed:", error);
+            alert("Couldn't access the camera: " + error.message);
+            return;
+        }
+
+        scannerVideo.srcObject = scannerStream;
+        scannerVideo.play();
+
+        scannerOverlay.classList.remove("hidden");
+
+        scannerFrameRequest = requestAnimationFrame(scanFrame);
+    }
+
+
+    function stopScanner() {
+
+        if (scannerFrameRequest) {
+
+            cancelAnimationFrame(scannerFrameRequest);
+            scannerFrameRequest = null;
+        }
+
+        if (scannerStream) {
+
+            scannerStream.getTracks().forEach(track => track.stop());
+            scannerStream = null;
+        }
+
+        scannerVideo.srcObject = null;
+
+        scannerOverlay.classList.add("hidden");
+    }
+
+
+    function scanFrame() {
+
+        if (scannerVideo.readyState === scannerVideo.HAVE_ENOUGH_DATA) {
+
+            scannerCanvas.width = scannerVideo.videoWidth;
+            scannerCanvas.height = scannerVideo.videoHeight;
+
+            scannerContext.drawImage(
+                scannerVideo, 0, 0, scannerCanvas.width, scannerCanvas.height
+            );
+
+            const frame = scannerContext.getImageData(
+                0, 0, scannerCanvas.width, scannerCanvas.height
+            );
+
+            const result = jsQR(frame.data, frame.width, frame.height);
+
+            if (result && result.data) {
+
+                stopScanner();
+
+                roomInput.value = result.data.trim().toUpperCase();
+
+                joinGame();
+
+                return;
+            }
+        }
+
+        scannerFrameRequest = requestAnimationFrame(scanFrame);
     }
 
 

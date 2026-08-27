@@ -1,7 +1,7 @@
 {
     "name": "WebRTC Games",
     "short_name": "WebRTC Games",
-    "description": "Connect with a friend and play Tic Tac Toe, Caro, and Battleship together over a peer-to-peer connection.",
+    "description": "Connect with a friend and play Caro and Battleship together over a peer-to-peer connection.",
     "start_url": "index.html",
     "scope": "./",
     "display": "standalone",

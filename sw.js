@@ -1,4 +1,4 @@
-const CACHE_NAME = "webrtc-games-v1";
+const CACHE_NAME = "webrtc-games-v2";
 
 const APP_SHELL = [
     "index.html",
@@ -6,7 +6,6 @@ const APP_SHELL = [
     "favicon.svg",
     "common/peer-network.js",
     "common/network-bridge.js",
-    "games/tic-tac-toe/index.html",
     "games/caro/index.html",
     "games/battleship/index.html",
     "icons/icon-192.png",
