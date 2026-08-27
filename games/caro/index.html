@@ -14,23 +14,20 @@
 
     <title>WebRTC Caro</title>
 
+    <link rel="stylesheet" href="../../common/theme.css">
+
     <!-- Common networking layer shared by all games in this repo -->
     <script src="../../common/network-bridge.js"></script>
 
     <style>
-
-        * {
-            box-sizing: border-box;
-        }
 
         :root {
             --cell-size: clamp(16px, 6vw, 30px);
         }
 
         body {
-            font-family: Arial, sans-serif;
             max-width: 600px;
-            margin: 40px auto;
+            margin: 20px auto;
             padding: 0 16px;
             text-align: center;
         }
@@ -38,19 +35,14 @@
         @media (max-width: 480px) {
 
             body {
-                margin: 20px auto;
+                margin: 12px auto;
             }
         }
 
-        button {
-            padding: 10px 20px;
-            margin: 5px;
-            cursor: pointer;
-        }
-
         #status {
-            margin: 20px;
-            font-size: 20px;
+            margin: 8px 0;
+            font-size: 17px;
+            font-weight: 600;
         }
 
         #board {
@@ -62,19 +54,25 @@
             grid-template-rows:
                 repeat(15, var(--cell-size));
 
-            gap: 1px;
+            gap: 2px;
 
             width: max-content;
             max-width: 100%;
 
-            margin: 30px auto;
+            margin: 28px auto;
+
+            background: var(--color-border);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+
+            overflow: hidden;
         }
 
         .cell {
             width: var(--cell-size);
             height: var(--cell-size);
 
-            border: 1px solid #333;
+            background: var(--color-bg);
 
             display: flex;
 
@@ -82,17 +80,23 @@
             align-items: center;
 
             font-size: clamp(10px, 3vw, 16px);
-            font-weight: bold;
+            font-weight: 700;
 
             cursor: pointer;
+
+            transition: background 0.1s ease;
         }
 
         .cell:hover {
-            background: #eee;
+            background: var(--color-bg-subtle);
         }
 
-        .hidden {
-            display: none;
+        .cell.mark-x {
+            color: var(--color-accent);
+        }
+
+        .cell.mark-o {
+            color: #f97316;
         }
 
     </style>
@@ -101,11 +105,9 @@
 
 <body>
 
-<p><a id="backLink" href="../../index.html">&larr; All games</a></p>
+<a id="backLink" class="back-link" href="../../index.html">&larr; All games</a>
 
-<h1>WebRTC Caro</h1>
-
-<p>15x15 board. First to line up 5 in a row (any direction) wins.</p>
+<p class="lead">15x15 board. First to line up 5 in a row (any direction) wins.</p>
 
 
 <!-- =====================================================
@@ -130,15 +132,112 @@
 <script>
 
     // =====================================================
+    // SOLO MODE - LOCAL AI OPPONENT
+    //
+    // Drop-in stand-in for NetworkBridge, same public shape (on / send
+    // / isHost / connection), used when the shell loads this page with
+    // ?mode=solo instead of embedding it in a real connection.
+    //
+    // The human is always HOST/X. Where a real host would broadcast
+    // STATE to a remote guest, this intercepts that broadcast, picks
+    // O's move locally, and feeds it back as a MOVE message - so it
+    // runs through the exact same handleGuestMove()/applyMove() path
+    // a real guest's move would, with no game-logic duplication.
+    // =====================================================
+
+    class CaroAI {
+
+        constructor(difficulty) {
+
+            this.difficulty = difficulty;
+
+            this.connection = { open: true };
+
+            this.handlers = {
+                open: [], connected: [], data: [], close: [], error: []
+            };
+
+            setTimeout(() => this._emit("connected"), 0);
+        }
+
+
+        on(event, handler) {
+
+            this.handlers[event].push(handler);
+
+            return this;
+        }
+
+
+        _emit(event, ...args) {
+
+            this.handlers[event].forEach(handler => handler(...args));
+        }
+
+
+        get isHost() {
+
+            return true;
+        }
+
+
+        send(data) {
+
+            if (data.type !== "STATE") {
+                return;
+            }
+
+            const state = data.state;
+
+            if (state.gameOver || state.currentTurn !== "O") {
+                return;
+            }
+
+            const index = chooseAiMove(state.board, this.difficulty);
+
+            const delay = 300 + Math.random() * 500;
+
+            setTimeout(() => {
+
+                this._emit("data", { type: "MOVE", index });
+
+            }, delay);
+        }
+
+
+        leaveToMenu() {
+
+            window.parent.postMessage(
+                { source: "bridge", type: "leave" },
+                "*"
+            );
+        }
+    }
+
+
+    // =====================================================
     // NETWORK
     //
     // This game only runs embedded in the game-menu shell's iframe.
     // The shell owns the single real PeerJS connection; this file
     // talks to it through common/network-bridge.js and only cares
     // about caro's own message protocol (MOVE / STATE) and rules.
+    //
+    // Except in solo mode (?mode=solo), where CaroAI above stands in
+    // for the shell/network entirely - see the class comment.
     // =====================================================
 
-    const network = new NetworkBridge();
+    const soloParams = new URLSearchParams(location.search);
+
+    const soloDifficulty =
+        soloParams.get("mode") === "solo"
+            ? (soloParams.get("difficulty") || "medium")
+            : null;
+
+    const network =
+        soloDifficulty
+            ? new CaroAI(soloDifficulty)
+            : new NetworkBridge();
 
 
     // =====================================================
@@ -506,7 +605,7 @@
          */
 
         const result =
-            checkWinner(index);
+            checkWinner(gameState.board, index);
 
 
         if (result) {
@@ -537,9 +636,13 @@
     // Only needs to check lines that pass through the cell
     // that was just played (lastIndex) - a move can only ever
     // create a new winning line through itself.
+    //
+    // Takes a board array explicitly (rather than reading gameState
+    // directly) so the solo-mode AI can also use it against
+    // hypothetical boards when picking a move.
     // =====================================================
 
-    function checkWinner(lastIndex) {
+    function checkWinner(board, lastIndex) {
 
         const row =
             Math.floor(lastIndex / BOARD_SIZE);
@@ -548,7 +651,7 @@
             lastIndex % BOARD_SIZE;
 
         const symbol =
-            gameState.board[lastIndex];
+            board[lastIndex];
 
 
         const directions = [
@@ -575,7 +678,7 @@
             ) {
 
                 if (
-                    getCell(row + dr * step, col + dc * step) !==
+                    getCell(board, row + dr * step, col + dc * step) !==
                     symbol
                 ) {
                     break;
@@ -596,7 +699,7 @@
             ) {
 
                 if (
-                    getCell(row - dr * step, col - dc * step) !==
+                    getCell(board, row - dr * step, col - dc * step) !==
                     symbol
                 ) {
                     break;
@@ -618,7 +721,7 @@
          */
 
         if (
-            gameState.board.every(
+            board.every(
                 cell => cell !== null
             )
         ) {
@@ -631,7 +734,7 @@
     }
 
 
-    function getCell(row, col) {
+    function getCell(board, row, col) {
 
         if (
             row < 0 ||
@@ -643,9 +746,172 @@
             return null;
         }
 
-        return gameState.board[
+        return board[
             row * BOARD_SIZE + col
         ];
+    }
+
+
+    // =====================================================
+    // AI MOVE SELECTION (solo mode only)
+    //
+    //   easy   - a random empty cell.
+    //   medium - takes an immediate win/block when available,
+    //            otherwise a weighted-random pick among the better
+    //            nearby cells.
+    //   hard   - same, but always takes the single best-scoring cell.
+    // =====================================================
+
+    function chooseAiMove(board, difficulty) {
+
+        const empties = [];
+
+        for (let i = 0; i < board.length; i++) {
+
+            if (board[i] === null) {
+                empties.push(i);
+            }
+        }
+
+        if (empties.length === board.length) {
+
+            return Math.floor(BOARD_SIZE / 2) * BOARD_SIZE +
+                Math.floor(BOARD_SIZE / 2);
+        }
+
+        if (difficulty === "easy") {
+
+            return empties[
+                Math.floor(Math.random() * empties.length)
+            ];
+        }
+
+        const near = empties.filter(i => hasNearbyStone(board, i, 2));
+        const pool = near.length ? near : empties;
+
+        for (const i of pool) {
+
+            if (wouldWin(board, i, "O")) {
+                return i;
+            }
+        }
+
+        for (const i of pool) {
+
+            if (wouldWin(board, i, "X")) {
+                return i;
+            }
+        }
+
+        const defenseWeight = difficulty === "hard" ? 1 : 0.8;
+
+        const scored = pool.map(i => ({
+            index: i,
+            score:
+                scoreCell(board, i, "O") +
+                defenseWeight * scoreCell(board, i, "X")
+        }));
+
+        scored.sort((a, b) => b.score - a.score);
+
+        const topCount = difficulty === "hard" ? 1 : 3;
+        const top = scored.slice(0, Math.min(topCount, scored.length));
+
+        return top[Math.floor(Math.random() * top.length)].index;
+    }
+
+
+    function hasNearbyStone(board, index, radius) {
+
+        const row = Math.floor(index / BOARD_SIZE);
+        const col = index % BOARD_SIZE;
+
+        for (let r = row - radius; r <= row + radius; r++) {
+
+            for (let c = col - radius; c <= col + radius; c++) {
+
+                if (r < 0 || r >= BOARD_SIZE || c < 0 || c >= BOARD_SIZE) {
+                    continue;
+                }
+
+                if (board[r * BOARD_SIZE + c] !== null) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+
+    function wouldWin(board, index, symbol) {
+
+        board[index] = symbol;
+
+        const won = checkWinner(board, index) === symbol;
+
+        board[index] = null;
+
+        return won;
+    }
+
+
+    function scoreCell(board, index, symbol) {
+
+        const row = Math.floor(index / BOARD_SIZE);
+        const col = index % BOARD_SIZE;
+
+        const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+
+        let total = 0;
+
+        for (const [dr, dc] of directions) {
+
+            let count = 1;
+            let openEnds = 0;
+
+            let r = row + dr, c = col + dc, steps = 0;
+
+            while (
+                steps < WIN_LENGTH - 1 &&
+                getCell(board, r, c) === symbol
+            ) {
+                count++; r += dr; c += dc; steps++;
+            }
+
+            if (getCell(board, r, c) === null) {
+                openEnds++;
+            }
+
+            r = row - dr; c = col - dc; steps = 0;
+
+            while (
+                steps < WIN_LENGTH - 1 &&
+                getCell(board, r, c) === symbol
+            ) {
+                count++; r -= dr; c -= dc; steps++;
+            }
+
+            if (getCell(board, r, c) === null) {
+                openEnds++;
+            }
+
+            total += patternValue(count, openEnds);
+        }
+
+        return total;
+    }
+
+
+    function patternValue(count, openEnds) {
+
+        if (count >= 5) return 100000;
+        if (count === 4) return openEnds >= 1 ? 10000 : 1000;
+        if (count === 3) return openEnds === 2 ? 1000 : (openEnds === 1 ? 200 : 0);
+        if (count === 2) return openEnds === 2 ? 100 : (openEnds === 1 ? 20 : 0);
+        if (count === 1) return openEnds === 2 ? 10 : 2;
+
+        return 0;
     }
 
 
@@ -707,7 +973,9 @@
                     );
 
                 cell.className =
-                    "cell";
+                    "cell" +
+                    (value === "X" ? " mark-x" : "") +
+                    (value === "O" ? " mark-o" : "");
 
 
                 cell.textContent =

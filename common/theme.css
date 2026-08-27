@@ -1,0 +1,236 @@
+/*
+ * Shared minimalist design tokens + base component styles for every
+ * page in this repo (shell + each game). Keeps the look consistent
+ * without a build step - just a plain stylesheet every page links to.
+ *
+ * Pages layer their own page-specific rules (board grids, cell states,
+ * etc.) on top of this in their own <style> block.
+ */
+
+:root {
+
+    --color-bg: #ffffff;
+    --color-bg-subtle: #f7f7f8;
+    --color-bg-muted: #f1f1f3;
+
+    --color-border: #e6e6e9;
+    --color-border-strong: #d6d6db;
+
+    --color-text: #1c1c1e;
+    --color-text-secondary: #6b6b70;
+    --color-text-tertiary: #a3a3a8;
+
+    --color-accent: #6366f1;
+    --color-accent-hover: #4f46e5;
+    --color-accent-subtle: #eef0fe;
+
+    --color-success: #16a34a;
+    --color-success-subtle: #dcfce7;
+    --color-danger: #dc2626;
+    --color-danger-subtle: #fee2e2;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-sans);
+    color: var(--color-text);
+    background: var(--color-bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+p {
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.lead {
+    max-width: 440px;
+    margin: 0 auto 32px;
+    font-size: 15px;
+}
+
+a {
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+a:hover {
+    color: var(--color-accent);
+}
+
+.back-link {
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+
+/* =====================================================
+   BUTTONS
+====================================================== */
+
+button {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 10px 20px;
+    margin: 4px;
+
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-strong);
+
+    background: var(--color-bg);
+    color: var(--color-text);
+
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+button:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+button:disabled {
+    opacity: 0.45;
+    cursor: default;
+    border-color: var(--color-border);
+    color: var(--color-text-tertiary);
+}
+
+button:disabled:hover {
+    border-color: var(--color-border);
+    color: var(--color-text-tertiary);
+}
+
+button.btn-primary {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+}
+
+button.btn-primary:hover {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+    color: #fff;
+}
+
+button.btn-ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-text-secondary);
+}
+
+button.btn-ghost:hover {
+    background: var(--color-bg-subtle);
+    border-color: transparent;
+    color: var(--color-text);
+}
+
+button.btn-link {
+    display: inline;
+    padding: 0;
+    margin: 0;
+
+    border: none;
+    background: none;
+
+    font: inherit;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+button.btn-link:hover {
+    border: none;
+    background: none;
+    color: var(--color-accent);
+}
+
+
+/* =====================================================
+   INPUTS
+====================================================== */
+
+input {
+    font-family: inherit;
+    font-size: 15px;
+    padding: 10px 14px;
+
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border-strong);
+
+    background: var(--color-bg);
+    color: var(--color-text);
+
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+
+/* =====================================================
+   COLLAPSIBLE PANELS
+====================================================== */
+
+details {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg);
+}
+
+details > summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 14px 18px;
+    user-select: none;
+    list-style: none;
+}
+
+details > summary::-webkit-details-marker {
+    display: none;
+}
+
+details > summary:hover {
+    background: var(--color-bg-subtle);
+}
+
+details[open] > summary {
+    border-bottom: 1px solid var(--color-border);
+}
+
+.collapsible-body {
+    padding: 18px;
+}
+
+
+.hidden {
+    display: none !important;
+}

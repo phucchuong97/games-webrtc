@@ -14,23 +14,20 @@
 
     <title>WebRTC Battleship</title>
 
+    <link rel="stylesheet" href="../../common/theme.css">
+
     <!-- Common networking layer shared by all games in this repo -->
     <script src="../../common/network-bridge.js"></script>
 
     <style>
-
-        * {
-            box-sizing: border-box;
-        }
 
         :root {
             --cell-size: clamp(22px, 7.5vw, 28px);
         }
 
         body {
-            font-family: Arial, sans-serif;
             max-width: 720px;
-            margin: 40px auto;
+            margin: 20px auto;
             text-align: center;
             padding: 0 16px;
         }
@@ -38,34 +35,37 @@
         @media (max-width: 480px) {
 
             body {
-                margin: 20px auto;
+                margin: 12px auto;
             }
         }
 
-        button {
-            padding: 10px 20px;
-            margin: 5px;
-            cursor: pointer;
+        .header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+            text-align: left;
         }
 
-        button:disabled {
-            cursor: default;
-            opacity: 0.5;
+        .header-row .back-link {
+            margin-bottom: 0;
         }
 
         #status {
-            margin: 20px;
-            font-size: 20px;
+            margin: 0 0 8px;
+            font-size: 17px;
+            font-weight: 600;
         }
 
         #event {
-            min-height: 22px;
-            font-size: 16px;
-            color: #555;
+            margin: 0 0 8px;
+            font-size: 14px;
+            color: var(--color-text-secondary);
         }
 
-        .hidden {
-            display: none;
+        #placementTitle {
+            margin: 0 0 10px;
         }
 
         .controls {
@@ -81,12 +81,18 @@
             grid-template-rows:
                 repeat(10, var(--cell-size));
 
-            gap: 1px;
+            gap: 2px;
 
             width: max-content;
             max-width: 100%;
 
             margin: 15px auto;
+
+            background: var(--color-border);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+
+            overflow: hidden;
         }
 
         .cell {
@@ -95,8 +101,7 @@
             width: var(--cell-size);
             height: var(--cell-size);
 
-            border: 1px solid #333;
-            background: #eaf4fb;
+            background: var(--color-bg);
 
             display: flex;
 
@@ -104,28 +109,37 @@
             align-items: center;
 
             font-size: clamp(11px, 3.5vw, 14px);
-            font-weight: bold;
+            font-weight: 700;
 
             cursor: pointer;
 
             overflow: hidden;
+
+            transition: background 0.1s ease;
         }
 
-        #ownBoard .cell {
+        #enemyBoard .cell:not(.hit):not(.miss):hover {
+            background: var(--color-accent-subtle);
+        }
+
+        #ownBoard .cell,
+        .cell.hit,
+        .cell.miss {
             cursor: default;
         }
 
         .cell.ship {
-            background: #7f8c8d;
+            background: var(--color-text-tertiary);
         }
 
         .cell.hit {
-            background: #e74c3c;
+            background: var(--color-danger);
             color: #fff;
         }
 
         .cell.miss {
-            background: #9fb3c8;
+            background: var(--color-bg-muted);
+            color: var(--color-text-tertiary);
         }
 
         .cell.fx-hit::after {
@@ -196,11 +210,11 @@
         }
 
         .cell.preview-valid {
-            background: #b8f0b3 !important;
+            background: #bbf7d0 !important;
         }
 
         .cell.preview-invalid {
-            background: #f3b3b3 !important;
+            background: #fecaca !important;
         }
 
         .boards {
@@ -211,47 +225,77 @@
         }
 
         .board-wrap h3 {
-            margin-bottom: 5px;
+            margin: 0 0 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--color-text-secondary);
         }
 
         #placementStatus {
             min-height: 20px;
-            color: #555;
-        }
-
-        #helpPanel {
-            max-width: 480px;
-            margin: 15px auto;
-            text-align: left;
-
-            border: 1px solid #ddd;
-            border-radius: 8px;
-        }
-
-        #helpPanel summary {
-            cursor: pointer;
-            font-weight: bold;
-            padding: 10px 14px;
-            user-select: none;
-            text-align: center;
-        }
-
-        #helpPanel summary:hover {
-            background: #f5f5f5;
-        }
-
-        #helpPanel[open] summary {
-            border-bottom: 1px solid #ddd;
-        }
-
-        #helpPanel .collapsible-body {
-            padding: 10px 14px;
             font-size: 14px;
-            color: #444;
+            color: var(--color-text-secondary);
         }
 
-        #helpPanel .collapsible-body p {
+        #helpOverlay {
+            position: fixed;
+            inset: 0;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            background: rgba(28, 28, 30, 0.6);
+            backdrop-filter: blur(4px);
+
+            padding: 20px;
+            z-index: 1000;
+        }
+
+        .help-box {
+            position: relative;
+
+            width: 100%;
+            max-width: 380px;
+            padding: 24px;
+
+            background: var(--color-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+
+            text-align: left;
+        }
+
+        .help-box h3 {
+            margin: 0 0 12px;
+        }
+
+        .help-box p {
             margin: 8px 0;
+            font-size: 14px;
+            color: var(--color-text-secondary);
+        }
+
+        .help-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+
+            padding: 4px 8px;
+            margin: 0;
+
+            border: none;
+            background: none;
+
+            font-size: 20px;
+            line-height: 1;
+            color: var(--color-text-secondary);
+        }
+
+        .help-close:hover {
+            border: none;
+            background: none;
+            color: var(--color-text);
         }
 
     </style>
@@ -260,15 +304,21 @@
 
 <body>
 
-<p><a id="backLink" href="../../index.html">&larr; All games</a></p>
+<div class="header-row">
 
-<h1>WebRTC Battleship</h1>
+    <a id="backLink" class="back-link" href="../../index.html">&larr; All games</a>
 
-<details id="helpPanel">
+    <button id="helpBtn" class="btn-ghost">❓ How to play</button>
 
-    <summary>❓ How to play</summary>
+</div>
 
-    <div class="collapsible-body">
+<div id="helpOverlay" class="hidden">
+
+    <div class="help-box">
+
+        <button id="helpClose" class="help-close" aria-label="Close">&times;</button>
+
+        <h3>How to play</h3>
 
         <p>
             Fleet: Carrier (5), Battleship (4), Cruiser (3), Submarine (3), Destroyer (2).
@@ -282,7 +332,7 @@
 
     </div>
 
-</details>
+</div>
 
 
 <!-- =====================================================
@@ -295,7 +345,7 @@
         Waiting...
     </div>
 
-    <div id="event"></div>
+    <div id="event" class="hidden"></div>
 
 
     <!-- =================================================
@@ -308,15 +358,15 @@
 
         <div class="controls">
 
-            <button id="rotateBtn">
+            <button id="rotateBtn" class="btn-ghost">
                 Rotate (Horizontal)
             </button>
 
-            <button id="randomizeBtn">
+            <button id="randomizeBtn" class="btn-ghost">
                 Randomize
             </button>
 
-            <button id="clearBtn">
+            <button id="clearBtn" class="btn-ghost">
                 Clear
             </button>
 
@@ -326,7 +376,7 @@
 
         <p id="placementStatus"></p>
 
-        <button id="readyBtn" class="hidden">
+        <button id="readyBtn" class="btn-primary hidden">
             Ready!
         </button>
 
@@ -355,7 +405,7 @@
 
     </div>
 
-    <button id="playAgain" class="hidden">
+    <button id="playAgain" class="btn-primary hidden">
         Play Again
     </button>
 
@@ -365,6 +415,285 @@
 <script>
 
     // =====================================================
+    // SOLO MODE - LOCAL AI OPPONENT
+    //
+    // Drop-in stand-in for NetworkBridge, same public shape (on / send
+    // / isHost / connection), used when the shell loads this page with
+    // ?mode=solo instead of embedding it in a real connection.
+    //
+    // The human is always HOST. This holds its own hidden fleet and
+    // plays the GUEST side of the exact same FIRE/RESULT/READY/REPLAY
+    // protocol a real remote opponent would - so it runs through the
+    // human's own handleIncomingFire()/handleIncomingResult() etc.
+    // unchanged, with no battle-rules duplication.
+    //
+    // Fleet setup is deferred (setTimeout) rather than done in the
+    // constructor because it depends on SHIPS/BOARD_SIZE and
+    // generateRandomFleet(), which are declared further down this
+    // same script - by the time the timer fires, the whole script has
+    // finished loading.
+    // =====================================================
+
+    class BattleshipAI {
+
+        constructor(difficulty) {
+
+            this.difficulty = difficulty;
+
+            this.connection = { open: true };
+
+            this.handlers = {
+                open: [], connected: [], data: [], close: [], error: []
+            };
+
+            this.board = null;
+            this.shipCells = null;
+            this.sunk = null;
+            this.hitsAgainstMe = null;
+
+            this.firedAt = null;
+            this.hitStack = [];
+
+            setTimeout(() => this._init(), 0);
+        }
+
+
+        on(event, handler) {
+
+            this.handlers[event].push(handler);
+
+            return this;
+        }
+
+
+        _emit(event, ...args) {
+
+            this.handlers[event].forEach(handler => handler(...args));
+        }
+
+
+        get isHost() {
+
+            return true;
+        }
+
+
+        _init() {
+
+            this._newFleet();
+
+            this._emit("connected");
+
+            setTimeout(() => this._emit("data", { type: "READY" }), 300);
+        }
+
+
+        _newFleet() {
+
+            const fleet = generateRandomFleet();
+
+            this.board = fleet.board;
+            this.shipCells = fleet.shipCells;
+            this.sunk = new Array(SHIPS.length).fill(false);
+            this.hitsAgainstMe = new Array(BOARD_SIZE * BOARD_SIZE).fill(false);
+
+            this.firedAt = new Array(BOARD_SIZE * BOARD_SIZE).fill(false);
+            this.hitStack = [];
+        }
+
+
+        send(data) {
+
+            if (data.type === "FIRE") {
+
+                this._resolveIncomingFire(data.index);
+
+                return;
+            }
+
+            if (data.type === "RESULT") {
+
+                this._onOwnShotResult(data);
+
+                return;
+            }
+
+            if (data.type === "REPLAY") {
+
+                this._newFleet();
+
+                setTimeout(() => this._emit("data", { type: "READY" }), 300);
+            }
+
+            // READY from the human is ignored - the AI signals its own
+            // readiness independently (see _init/REPLAY above).
+        }
+
+
+        /*
+         * Human fired at OUR board - resolve it against our fleet and
+         * report back, then (if the game isn't over) fire back after a
+         * short "thinking" beat.
+         */
+
+        _resolveIncomingFire(index) {
+
+            this.hitsAgainstMe[index] = true;
+
+            const shipIndex = this.board[index];
+            const hit = shipIndex !== null;
+
+            let sunkShipName = null;
+
+            if (hit) {
+
+                const cells = this.shipCells[shipIndex];
+
+                if (cells.every(i => this.hitsAgainstMe[i])) {
+
+                    this.sunk[shipIndex] = true;
+                    sunkShipName = SHIPS[shipIndex].name;
+                }
+            }
+
+            const gameOver = this.sunk.every(Boolean);
+
+            const resultMessage = {
+                type: "RESULT",
+                index,
+                hit,
+                sunkShipName,
+                gameOver,
+                winner: gameOver ? "HOST" : null
+            };
+
+            const delay = 250 + Math.random() * 300;
+
+            setTimeout(() => this._emit("data", resultMessage), delay);
+
+            if (!gameOver) {
+
+                setTimeout(() => this._fireBack(), delay + 350);
+            }
+        }
+
+
+        _fireBack() {
+
+            const index = this._chooseTarget();
+
+            this._emit("data", { type: "FIRE", index });
+        }
+
+
+        /*
+         * The human's client just told us the outcome of OUR last shot
+         * (via the same RESULT message a real opponent would send)-
+         * feed it into the hunt/target algorithm.
+         */
+
+        _onOwnShotResult(message) {
+
+            this.firedAt[message.index] = true;
+
+            if (this.difficulty !== "easy") {
+
+                this._updateTargeting(message.index, message.hit, message.sunkShipName);
+            }
+        }
+
+
+        /*
+         * easy   - a random cell every time, no memory of hits.
+         * medium - random hunting, but chases adjacent cells once it
+         *          lands a hit.
+         * hard   - checkerboard-pattern hunting (guarantees finding
+         *          every ship, since none is a single cell), plus the
+         *          same adjacent-cell chase once it lands a hit.
+         */
+
+        _chooseTarget() {
+
+            while (this.hitStack.length) {
+
+                const candidate = this.hitStack.pop();
+
+                if (!this.firedAt[candidate]) {
+                    return candidate;
+                }
+            }
+
+            const useParity = this.difficulty === "hard";
+            const pool = [];
+
+            for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+
+                if (this.firedAt[i]) {
+                    continue;
+                }
+
+                if (useParity) {
+
+                    const row = Math.floor(i / BOARD_SIZE);
+                    const col = i % BOARD_SIZE;
+
+                    if ((row + col) % 2 !== 0) {
+                        continue;
+                    }
+                }
+
+                pool.push(i);
+            }
+
+            if (!pool.length) {
+
+                for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+
+                    if (!this.firedAt[i]) {
+                        pool.push(i);
+                    }
+                }
+            }
+
+            return pool[Math.floor(Math.random() * pool.length)];
+        }
+
+
+        _updateTargeting(index, hit, sunkShipName) {
+
+            if (sunkShipName) {
+
+                this.hitStack = [];
+
+                return;
+            }
+
+            if (!hit) {
+                return;
+            }
+
+            const row = Math.floor(index / BOARD_SIZE);
+            const col = index % BOARD_SIZE;
+
+            [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]]
+                .filter(([r, c]) => r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE)
+                .map(([r, c]) => r * BOARD_SIZE + c)
+                .filter(i => !this.firedAt[i])
+                .forEach(i => this.hitStack.push(i));
+        }
+
+
+        leaveToMenu() {
+
+            window.parent.postMessage(
+                { source: "bridge", type: "leave" },
+                "*"
+            );
+        }
+    }
+
+
+    // =====================================================
     // NETWORK
     //
     // This game only runs embedded in the game-menu shell's iframe.
@@ -372,13 +701,27 @@
     // talks to it through common/network-bridge.js and only cares
     // about battleship's own message protocol and rules.
     //
-    // Unlike tic-tac-toe/caro, there is no single shared
-    // authoritative board here: each player is authoritative over
-    // their OWN fleet (only they know where their ships are), and
-    // only reveals hit/miss results for cells the opponent fires at.
+    // Unlike caro, there is no single shared authoritative board here:
+    // each player is authoritative over their OWN fleet (only they
+    // know where their ships are), and only reveals hit/miss results
+    // for cells the opponent fires at.
+    //
+    // Except in solo mode (?mode=solo), where BattleshipAI above
+    // stands in for the shell/network entirely - see the class
+    // comment.
     // =====================================================
 
-    const network = new NetworkBridge();
+    const soloParams = new URLSearchParams(location.search);
+
+    const soloDifficulty =
+        soloParams.get("mode") === "solo"
+            ? (soloParams.get("difficulty") || "medium")
+            : null;
+
+    const network =
+        soloDifficulty
+            ? new BattleshipAI(soloDifficulty)
+            : new NetworkBridge();
 
     let connectionOpen = false;
 
@@ -480,6 +823,26 @@
         });
 
 
+    // =====================================================
+    // HOW TO PLAY MODAL
+    // =====================================================
+
+    const helpOverlay = document.getElementById("helpOverlay");
+
+    document.getElementById("helpBtn")
+        .addEventListener("click", () => helpOverlay.classList.remove("hidden"));
+
+    document.getElementById("helpClose")
+        .addEventListener("click", () => helpOverlay.classList.add("hidden"));
+
+    helpOverlay.addEventListener("click", event => {
+
+        if (event.target === helpOverlay) {
+            helpOverlay.classList.add("hidden");
+        }
+    });
+
+
     function setupNetworkEvents() {
 
         network.on("connected", () => {
@@ -576,25 +939,58 @@
     }
 
 
-    function canPlaceCells(cells) {
+    function canPlaceCells(board, cells) {
 
-        return !!cells && cells.every(i => myBoard[i] === null);
+        return !!cells && cells.every(i => board[i] === null);
     }
 
 
-    function placeShip(shipIndex, startIndex, orient) {
+    function placeShip(board, shipCells, shipIndex, startIndex, orient) {
 
         const cells = shipCellsFor(startIndex, SHIPS[shipIndex].size, orient);
 
-        if (!canPlaceCells(cells)) {
+        if (!canPlaceCells(board, cells)) {
             return false;
         }
 
-        cells.forEach(i => { myBoard[i] = shipIndex; });
+        cells.forEach(i => { board[i] = shipIndex; });
 
-        myShipCells[shipIndex] = cells;
+        shipCells[shipIndex] = cells;
 
         return true;
+    }
+
+
+    /*
+     * Scatters the whole fleet onto a fresh board at random. Pure
+     * (returns a new board/shipCells pair rather than mutating global
+     * state), so it doubles as the "Randomize" button's implementation
+     * and as how the solo-mode AI generates its own hidden fleet.
+     */
+
+    function generateRandomFleet() {
+
+        const board = new Array(BOARD_SIZE * BOARD_SIZE).fill(null);
+        const shipCells = [];
+
+        SHIPS.forEach((ship, shipIndex) => {
+
+            let placed = false;
+            let attempts = 0;
+
+            while (!placed && attempts < 300) {
+
+                attempts++;
+
+                const orient = Math.random() < 0.5 ? "H" : "V";
+                const startIndex =
+                    Math.floor(Math.random() * BOARD_SIZE * BOARD_SIZE);
+
+                placed = placeShip(board, shipCells, shipIndex, startIndex, orient);
+            }
+        });
+
+        return { board, shipCells };
     }
 
 
@@ -604,7 +1000,8 @@
             return;
         }
 
-        const placed = placeShip(currentShipIndex, index, orientation);
+        const placed =
+            placeShip(myBoard, myShipCells, currentShipIndex, index, orientation);
 
         if (!placed) {
 
@@ -644,25 +1041,10 @@
             return;
         }
 
-        myBoard.fill(null);
-        myShipCells = [];
+        const fleet = generateRandomFleet();
 
-        SHIPS.forEach((ship, shipIndex) => {
-
-            let placed = false;
-            let attempts = 0;
-
-            while (!placed && attempts < 300) {
-
-                attempts++;
-
-                const orient = Math.random() < 0.5 ? "H" : "V";
-                const startIndex =
-                    Math.floor(Math.random() * BOARD_SIZE * BOARD_SIZE);
-
-                placed = placeShip(shipIndex, startIndex, orient);
-            }
-        });
+        myBoard = fleet.board;
+        myShipCells = fleet.shipCells;
 
         currentShipIndex = SHIPS.length;
 
@@ -699,7 +1081,7 @@
         const cells =
             shipCellsFor(index, SHIPS[currentShipIndex].size, orientation);
 
-        const valid = canPlaceCells(cells);
+        const valid = canPlaceCells(myBoard, cells);
 
         (cells || []).forEach(i => {
 
@@ -908,9 +1290,8 @@
     // =====================================================
     // HIT / MISS VISUAL EFFECTS
     //
-    // renderBattle() rebuilds every cell from scratch on each update,
-    // so there's no persistent element to animate - instead, grab the
-    // just-rendered cell for the index that changed and play a
+    // Board cells are persistent (see buildBattleBoards()), so this
+    // just grabs the cell for the index that changed and plays a
     // one-shot explosion/splash overlay on it (removed once the CSS
     // animation ends, leaving the plain hit/miss styling behind).
     // =====================================================
@@ -966,31 +1347,58 @@
     }
 
 
-    function renderBattle() {
+    /*
+     * Creates the 100 persistent cell elements for each board (once per
+     * game). Rebuilding every cell from scratch on every single shot -
+     * the previous approach - could leave a just-hit cell showing its
+     * stale style until some later, unrelated update forced the browser
+     * to repaint it. Keeping the same elements around and only ever
+     * updating their className/textContent avoids that class of
+     * rendering glitch entirely.
+     */
+
+    function buildBattleBoards() {
 
         ownBoardElement.innerHTML = "";
         enemyBoardElement.innerHTML = "";
 
         for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
 
-            const ownCell = document.createElement("div");
+            ownBoardElement.appendChild(document.createElement("div"));
+
+            const enemyCell = document.createElement("div");
+
+            enemyCell.addEventListener("click", () => handleEnemyBoardClick(i));
+
+            enemyBoardElement.appendChild(enemyCell);
+        }
+    }
+
+
+    function renderBattle() {
+
+        if (ownBoardElement.children.length !== BOARD_SIZE * BOARD_SIZE) {
+            buildBattleBoards();
+        }
+
+        for (let i = 0; i < BOARD_SIZE * BOARD_SIZE; i++) {
+
+            const ownCell = ownBoardElement.children[i];
 
             const isShip = myBoard[i] !== null;
             const isHit = myHits[i];
 
             ownCell.className =
                 "cell" +
-                (isShip ? " ship" : "") +
+                (isShip && !isHit ? " ship" : "") +
                 (isHit && isShip ? " hit" : "") +
                 (isHit && !isShip ? " miss" : "");
 
             ownCell.textContent =
                 isHit ? (isShip ? "X" : "•") : "";
 
-            ownBoardElement.appendChild(ownCell);
 
-
-            const enemyCell = document.createElement("div");
+            const enemyCell = enemyBoardElement.children[i];
 
             const known = opponentHits[i];
 
@@ -1001,10 +1409,6 @@
 
             enemyCell.textContent =
                 known === "HIT" ? "X" : known === "MISS" ? "•" : "";
-
-            enemyCell.addEventListener("click", () => handleEnemyBoardClick(i));
-
-            enemyBoardElement.appendChild(enemyCell);
         }
     }
 
@@ -1015,57 +1419,46 @@
 
     function updateStatus() {
 
+        let text = "";
+
         if (!network.connection) {
 
-            statusElement.textContent = "Waiting for opponent...";
+            text = "Waiting for opponent...";
 
-            return;
-        }
+        } else if (!network.connection.open) {
 
-        if (!network.connection.open) {
+            text = "Connecting...";
 
-            statusElement.textContent = "Connecting...";
+        } else if (phase === "PLACEMENT") {
 
-            return;
-        }
-
-        if (phase === "PLACEMENT") {
-
-            statusElement.textContent = localReady
+            text = localReady
                 ? "Waiting for opponent to finish placing ships..."
-                : "Place your fleet.";
+                : "";
 
-            return;
-        }
+        } else if (phase === "PLAYING") {
 
-        if (phase === "PLAYING") {
-
-            if (waitingForResult) {
-
-                statusElement.textContent = "Firing...";
-
-            } else {
-
-                statusElement.textContent = currentTurn === myRole()
+            text = waitingForResult
+                ? "Firing..."
+                : (currentTurn === myRole()
                     ? "Your turn - fire at the enemy waters!"
-                    : "Opponent's turn...";
-            }
+                    : "Opponent's turn...");
 
-            return;
-        }
+        } else if (phase === "GAME_OVER") {
 
-        if (phase === "GAME_OVER") {
-
-            statusElement.textContent = winner === myRole()
+            text = winner === myRole()
                 ? "You sank their entire fleet - you win!"
                 : "Your fleet was destroyed - you lose!";
         }
+
+        statusElement.textContent = text;
+        statusElement.classList.toggle("hidden", !text);
     }
 
 
     function showEvent(text) {
 
         eventElement.textContent = text;
+        eventElement.classList.toggle("hidden", !text);
     }
 
 
@@ -1108,7 +1501,7 @@
         placementElement.classList.remove("hidden");
         playAgainBtn.classList.add("hidden");
 
-        eventElement.textContent = "";
+        showEvent("");
 
         renderPlacement();
         updateStatus();
