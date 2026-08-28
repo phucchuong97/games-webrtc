@@ -163,6 +163,10 @@
 
         on(event, handler) {
 
+            if (!this.handlers[event]) {
+                this.handlers[event] = [];
+            }
+
             this.handlers[event].push(handler);
 
             return this;
@@ -351,7 +355,22 @@
 
 
         /*
-         * Opponent disconnected.
+         * Connection dropped - PeerNetwork/NetworkBridge will keep
+         * retrying for a while before giving up (see "close" below).
+         */
+
+        network.on(
+            "reconnecting",
+            () => {
+
+                statusElement.textContent =
+                    "Connection lost - reconnecting...";
+            }
+        );
+
+
+        /*
+         * Opponent disconnected (reconnect attempts exhausted).
          */
 
         network.on(

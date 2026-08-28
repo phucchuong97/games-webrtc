@@ -460,6 +460,10 @@
 
         on(event, handler) {
 
+            if (!this.handlers[event]) {
+                this.handlers[event] = [];
+            }
+
             this.handlers[event].push(handler);
 
             return this;
@@ -859,9 +863,21 @@
         });
 
 
+        network.on("reconnecting", () => {
+
+            connectionOpen = false;
+
+            statusElement.textContent = "Connection lost - reconnecting...";
+            statusElement.classList.remove("hidden");
+        });
+
+
         network.on("close", () => {
 
+            connectionOpen = false;
+
             statusElement.textContent = "Opponent disconnected - game ended.";
+            statusElement.classList.remove("hidden");
         });
 
 

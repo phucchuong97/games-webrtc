@@ -1,4 +1,4 @@
-const CACHE_NAME = "webrtc-games-v3";
+const CACHE_NAME = "webrtc-games-v4";
 
 const APP_SHELL = [
     "index.html",

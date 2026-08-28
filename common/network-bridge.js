@@ -24,6 +24,7 @@ class NetworkBridge {
             connected: [],
             data: [],
             close: [],
+            reconnecting: [],
             error: []
         };
 
@@ -40,6 +41,10 @@ class NetworkBridge {
 
 
     on(event, handler) {
+
+        if (!this.handlers[event]) {
+            this.handlers[event] = [];
+        }
 
         this.handlers[event].push(handler);
 
@@ -109,6 +114,24 @@ class NetworkBridge {
         if (message.type === "data") {
 
             this._emit("data", message.payload);
+
+            return;
+        }
+
+        if (message.type === "reconnecting") {
+
+            this.connection = { open: false };
+
+            this._emit("reconnecting");
+
+            return;
+        }
+
+        if (message.type === "reconnected") {
+
+            this.connection = { open: true };
+
+            this._emit("connected");
 
             return;
         }

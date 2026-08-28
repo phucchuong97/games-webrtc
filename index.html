@@ -537,12 +537,25 @@
             statusElement.textContent = "Pick a game to play together.";
 
             showMenu();
+
+            relayToFrame({ source: "shell", type: "reconnected" });
         });
 
 
         network.on("data", message => {
 
             handleMessage(message);
+        });
+
+
+        network.on("reconnecting", () => {
+
+            connectionElement.textContent = "Reconnecting...";
+
+            statusElement.textContent =
+                "Connection lost - trying to reconnect...";
+
+            relayToFrame({ source: "shell", type: "reconnecting" });
         });
 
 
