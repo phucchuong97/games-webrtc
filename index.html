@@ -44,16 +44,6 @@
             }
         }
 
-        h1 {
-            font-size: 26px;
-            margin: 0 0 8px;
-        }
-
-        details {
-            margin: 0 0 20px;
-            text-align: left;
-        }
-
         .lobby-primary {
             display: block;
             width: 100%;
@@ -95,25 +85,69 @@
             margin: 4px 0;
         }
 
-        .solo-row {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
+        .panel {
+            text-align: left;
+        }
+
+        .difficulty-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
             gap: 8px;
         }
 
-        #soloPanel {
-            margin: 0 0 12px;
+        .difficulty-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+
+            margin: 0;
+            padding: 16px 8px;
+
             text-align: center;
         }
 
-        .solo-status {
-            font-size: 14px;
-            color: var(--color-text-secondary);
+        .difficulty-icon {
+            font-size: 22px;
         }
 
-        .solo-status strong {
+        .difficulty-name {
+            font-size: 14px;
+            font-weight: 700;
             color: var(--color-text);
+        }
+
+        .difficulty-desc {
+            font-size: 11px;
+            color: var(--color-text-tertiary);
+            line-height: 1.3;
+        }
+
+        @media (max-width: 420px) {
+
+            .difficulty-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .difficulty-card {
+                flex-direction: row;
+                justify-content: flex-start;
+                text-align: left;
+                padding: 12px 14px;
+            }
+        }
+
+        #infoPanel {
+            margin: 0 0 16px;
+            text-align: center;
+        }
+
+        .room-code-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            margin: 4px 0 4px;
         }
 
         #room {
@@ -121,29 +155,35 @@
             font-size: 32px;
             font-weight: 700;
             letter-spacing: 0.08em;
-            margin: 4px 0 20px;
-            text-align: center;
+        }
+
+        #roomHint {
+            margin: 0 0 16px;
+            font-size: 13px;
+            color: var(--color-text-tertiary);
         }
 
         #roomQr {
             display: block;
-            margin: 0 auto 24px;
+            margin: 0 auto 16px;
             padding: 12px;
             border: 1px solid var(--color-border);
             border-radius: var(--radius-md);
-        }
-
-        #connection {
-            font-size: 16px;
-            font-weight: 600;
-            margin: 4px 0;
-            text-align: center;
         }
 
         #status {
             font-size: 14px;
             margin: 4px 0 0;
             text-align: center;
+            color: var(--color-text-secondary);
+        }
+
+        #soloPanel {
+            margin: 0 0 16px;
+        }
+
+        #soloPanel strong {
+            color: var(--color-text);
         }
 
         #scannerOverlay {
@@ -154,7 +194,7 @@
             align-items: center;
             justify-content: center;
 
-            background: rgba(28, 28, 30, 0.6);
+            background: rgba(10, 10, 14, 0.6);
             backdrop-filter: blur(4px);
 
             padding: 20px;
@@ -166,7 +206,7 @@
             max-width: 360px;
             padding: 24px;
 
-            background: var(--color-bg);
+            background: var(--color-bg-elevated);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-md);
 
@@ -188,11 +228,11 @@
             display: grid;
 
             grid-template-columns:
-                repeat(auto-fill, minmax(160px, 1fr));
+                repeat(auto-fill, minmax(150px, 1fr));
 
-            gap: 16px;
+            gap: 14px;
 
-            margin: 32px 0;
+            margin: 28px 0;
         }
 
         .game-card {
@@ -203,12 +243,12 @@
 
             gap: 12px;
 
-            padding: 28px 16px;
+            padding: 26px 16px;
 
             border: 1px solid var(--color-border);
             border-radius: var(--radius-lg);
 
-            background: var(--color-bg);
+            background: var(--color-bg-elevated);
             font: inherit;
             color: inherit;
 
@@ -218,7 +258,7 @@
         .game-card:hover {
             border-color: var(--color-accent);
             transform: translateY(-2px);
-            box-shadow: var(--shadow-sm);
+            box-shadow: var(--shadow-md);
         }
 
         .game-icon {
@@ -226,13 +266,13 @@
             align-items: center;
             justify-content: center;
 
-            width: 56px;
-            height: 56px;
+            width: 54px;
+            height: 54px;
 
             border-radius: 50%;
             background: var(--color-accent-subtle);
 
-            font-size: 26px;
+            font-size: 24px;
         }
 
         .game-name {
@@ -270,15 +310,34 @@
 
 <body>
 
+<div id="appHeader" class="app-header">
+    <img class="app-icon" src="favicon.svg" width="52" height="52" alt="">
+
+    <h1>WebRTC Games</h1>
+    <p class="app-tagline">Play with a friend peer-to-peer, or practice solo against the AI.</p>
+</div>
+
+
 <!-- =====================================================
      LOBBY
 ====================================================== -->
 
-<details id="lobby" open>
+<div id="lobby">
 
-    <summary>Create / Join Game</summary>
+    <div class="segmented">
 
-    <div class="collapsible-body">
+        <button id="tabOnline" class="is-active">
+            Play Online
+        </button>
+
+        <button id="tabSolo">
+            Solo vs AI
+        </button>
+
+    </div>
+
+
+    <div id="onlinePanel" class="panel">
 
         <button id="createGame" class="btn-primary lobby-primary">
             Create Game
@@ -294,28 +353,45 @@
             >
 
             <button id="joinGame">
-                Join Game
+                Join
             </button>
 
-            <button id="scanQr">
-                📷 Scan QR
+            <button id="scanQr" class="icon-btn" aria-label="Scan QR code" title="Scan QR code">
+                📷
             </button>
-
-        </div>
-
-        <div class="divider"><span>or play solo vs AI</span></div>
-
-        <div class="solo-row">
-
-            <button id="soloEasy">Easy</button>
-            <button id="soloMedium">Medium</button>
-            <button id="soloHard">Hard</button>
 
         </div>
 
     </div>
 
-</details>
+
+    <div id="soloSelectPanel" class="panel hidden">
+
+        <div class="difficulty-grid">
+
+            <button id="soloEasy" class="difficulty-card">
+                <span class="difficulty-icon">🙂</span>
+                <span class="difficulty-name">Easy</span>
+                <span class="difficulty-desc">Relaxed &amp; forgiving</span>
+            </button>
+
+            <button id="soloMedium" class="difficulty-card">
+                <span class="difficulty-icon">🧠</span>
+                <span class="difficulty-name">Medium</span>
+                <span class="difficulty-desc">A fair challenge</span>
+            </button>
+
+            <button id="soloHard" class="difficulty-card">
+                <span class="difficulty-icon">🔥</span>
+                <span class="difficulty-name">Hard</span>
+                <span class="difficulty-desc">Plays to win</span>
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
 
 
 <!-- =====================================================
@@ -347,35 +423,40 @@
 
 <div id="menu" class="hidden">
 
-    <details id="infoPanel" open>
+    <div id="infoPanel" class="surface surface-pad">
 
-        <summary>Room &amp; Connection</summary>
+        <div id="connectionPill" class="status-pill is-pending">
+            <span class="status-dot"></span>
+            <span id="connection">Connecting...</span>
+        </div>
 
-        <div class="collapsible-body">
+        <div id="roomBlock" class="hidden">
 
-            <div id="room" class="hidden"></div>
+            <div class="room-code-row">
+
+                <div id="room"></div>
+
+                <button id="copyRoom" class="icon-btn btn-ghost" aria-label="Copy room code" title="Copy room code">
+                    📋
+                </button>
+
+            </div>
+
+            <p id="roomHint">Share this code, or the QR below, with a friend</p>
 
             <canvas id="roomQr" class="hidden"></canvas>
 
-            <div id="connection">
-                Connecting...
-            </div>
-
-            <div id="status">
-                Waiting...
-            </div>
-
         </div>
 
-    </details>
+        <div id="status">
+            Waiting...
+        </div>
 
-    <div id="soloPanel" class="hidden">
+    </div>
 
-        <p class="solo-status">
-            🤖 Solo · <strong id="soloDifficultyLabel">Medium</strong> ·
-            <button id="exitSolo" class="btn-link">Exit</button>
-        </p>
-
+    <div id="soloPanel" class="badge hidden">
+        🤖 Solo &middot; <strong id="soloDifficultyLabel">Medium</strong> &middot;
+        <button id="exitSolo" class="btn-link">Exit</button>
     </div>
 
     <div id="games"></div>
@@ -424,15 +505,24 @@
     // DOM
     // =====================================================
 
+    const appHeader = document.getElementById("appHeader");
     const lobby = document.getElementById("lobby");
     const menu = document.getElementById("menu");
 
+    const tabOnline = document.getElementById("tabOnline");
+    const tabSolo = document.getElementById("tabSolo");
+    const onlinePanel = document.getElementById("onlinePanel");
+    const soloSelectPanel = document.getElementById("soloSelectPanel");
+
     const roomElement = document.getElementById("room");
+    const roomBlock = document.getElementById("roomBlock");
     const roomQrElement = document.getElementById("roomQr");
     const roomInput = document.getElementById("roomInput");
+    const copyRoomBtn = document.getElementById("copyRoom");
 
     const statusElement = document.getElementById("status");
     const connectionElement = document.getElementById("connection");
+    const connectionPill = document.getElementById("connectionPill");
 
     const gamesElement = document.getElementById("games");
     const gameFrame = document.getElementById("gameFrame");
@@ -443,6 +533,38 @@
     const infoPanel = document.getElementById("infoPanel");
     const soloPanel = document.getElementById("soloPanel");
     const soloDifficultyLabel = document.getElementById("soloDifficultyLabel");
+
+
+    // =====================================================
+    // LOBBY TABS (Play Online / Solo vs AI)
+    // =====================================================
+
+    tabOnline.addEventListener("click", () => setLobbyTab("online"));
+    tabSolo.addEventListener("click", () => setLobbyTab("solo"));
+
+    function setLobbyTab(tab) {
+
+        const isOnline = tab === "online";
+
+        tabOnline.classList.toggle("is-active", isOnline);
+        tabSolo.classList.toggle("is-active", !isOnline);
+
+        onlinePanel.classList.toggle("hidden", !isOnline);
+        soloSelectPanel.classList.toggle("hidden", isOnline);
+    }
+
+
+    // =====================================================
+    // CONNECTION STATUS PILL
+    // =====================================================
+
+    function setConnectionStatus(text, state) {
+
+        connectionElement.textContent = text;
+
+        connectionPill.classList.remove("is-pending", "is-active", "is-good", "is-bad");
+        connectionPill.classList.add(state);
+    }
 
 
     // =====================================================
@@ -482,6 +604,15 @@
     document.getElementById("scannerCancel")
         .addEventListener("click", stopScanner);
 
+    copyRoomBtn.addEventListener("click", copyRoomCode);
+
+    roomInput.addEventListener("keydown", event => {
+
+        if (event.key === "Enter") {
+            joinGame();
+        }
+    });
+
 
     function createGame() {
 
@@ -509,6 +640,27 @@
     }
 
 
+    function copyRoomCode() {
+
+        const code = roomElement.textContent;
+
+        if (!code || !navigator.clipboard) {
+            return;
+        }
+
+        navigator.clipboard.writeText(code).then(() => {
+
+            const original = copyRoomBtn.textContent;
+
+            copyRoomBtn.textContent = "✅";
+
+            setTimeout(() => {
+                copyRoomBtn.textContent = original;
+            }, 1200);
+        });
+    }
+
+
     function setupNetworkEvents() {
 
         network.on("open", idOrRoomCode => {
@@ -516,13 +668,13 @@
             if (network.isHost) {
 
                 roomElement.textContent = idOrRoomCode;
-                roomElement.classList.remove("hidden");
+                roomBlock.classList.remove("hidden");
 
                 renderRoomQr(idOrRoomCode);
 
                 showMenu();
 
-                connectionElement.textContent = "Waiting for opponent...";
+                setConnectionStatus("Waiting for opponent...", "is-pending");
 
                 statusElement.textContent =
                     "Share this room code with a friend to play together.";
@@ -532,7 +684,7 @@
 
         network.on("connected", () => {
 
-            connectionElement.textContent = "Connected";
+            setConnectionStatus("Connected", "is-good");
 
             statusElement.textContent = "Pick a game to play together.";
 
@@ -550,7 +702,7 @@
 
         network.on("reconnecting", () => {
 
-            connectionElement.textContent = "Reconnecting...";
+            setConnectionStatus("Reconnecting...", "is-pending");
 
             statusElement.textContent =
                 "Connection lost - trying to reconnect...";
@@ -561,7 +713,7 @@
 
         network.on("close", () => {
 
-            connectionElement.textContent = "Opponent disconnected";
+            setConnectionStatus("Opponent disconnected", "is-bad");
 
             statusElement.textContent = "";
 
@@ -575,7 +727,7 @@
 
             if (network.isHost) {
 
-                connectionElement.textContent = "Error: " + error.type;
+                setConnectionStatus("Error: " + error.type, "is-bad");
 
             } else {
 
@@ -589,6 +741,8 @@
 
         lobby.classList.add("hidden");
         menu.classList.remove("hidden");
+
+        appHeader.classList.add("hidden");
     }
 
 
@@ -647,6 +801,8 @@
 
         menu.classList.add("hidden");
         lobby.classList.remove("hidden");
+
+        appHeader.classList.remove("hidden");
     }
 
 

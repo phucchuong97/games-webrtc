@@ -39,29 +39,14 @@
             }
         }
 
-        .header-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 14px;
-            text-align: left;
-        }
-
-        .header-row .back-link {
-            margin-bottom: 0;
-        }
-
         #status {
-            margin: 0 0 8px;
-            font-size: 17px;
-            font-weight: 600;
+            margin: 8px 0;
+            display: flex;
+            justify-content: center;
         }
 
         #event {
-            margin: 0 0 8px;
-            font-size: 14px;
-            color: var(--color-text-secondary);
+            margin: 0 0 16px;
         }
 
         #placementTitle {
@@ -100,6 +85,8 @@
 
             width: var(--cell-size);
             height: var(--cell-size);
+
+            border-radius: 3px;
 
             background: var(--color-bg);
 
@@ -248,7 +235,7 @@
             align-items: center;
             justify-content: center;
 
-            background: rgba(28, 28, 30, 0.6);
+            background: rgba(10, 10, 14, 0.6);
             backdrop-filter: blur(4px);
 
             padding: 20px;
@@ -262,7 +249,7 @@
             max-width: 380px;
             padding: 24px;
 
-            background: var(--color-bg);
+            background: var(--color-bg-elevated);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-md);
 
@@ -307,11 +294,13 @@
 
 <body>
 
-<div class="header-row">
+<div class="top-bar">
 
     <a id="backLink" class="back-link" href="../../index.html">&larr; All games</a>
 
-    <button id="helpBtn" class="btn-ghost">❓ How to play</button>
+    <span class="top-bar-title">Battleship</span>
+
+    <button id="helpBtn" class="icon-btn btn-ghost" aria-label="How to play" title="How to play">❓</button>
 
 </div>
 
@@ -345,10 +334,13 @@
 <div id="game" class="hidden">
 
     <div id="status">
-        Waiting...
+        <span id="statusPill" class="status-pill is-pending">
+            <span class="status-dot"></span>
+            <span id="statusText">Waiting...</span>
+        </span>
     </div>
 
-    <div id="event" class="hidden"></div>
+    <div id="event" class="badge hidden"></div>
 
 
     <!-- =================================================
@@ -778,8 +770,32 @@
 
     const game = document.getElementById("game");
 
-    const statusElement = document.getElementById("status");
+    const statusPillElement = document.getElementById("statusPill");
+    const statusTextElement = document.getElementById("statusText");
     const eventElement = document.getElementById("event");
+
+
+    // =====================================================
+    // SET STATUS
+    //
+    // state is one of "pending" | "active" | "good" | "bad", driving
+    // the status pill's color (see .status-pill in theme.css). The
+    // pill hides itself entirely when given an empty string, matching
+    // the old plain-text behaviour during mid-placement.
+    // =====================================================
+
+    function setStatus(text, state = "pending") {
+
+        statusTextElement.textContent = text;
+
+        statusPillElement.classList.toggle("hidden", !text);
+
+        statusPillElement.classList.remove(
+            "is-pending", "is-active", "is-good", "is-bad"
+        );
+
+        statusPillElement.classList.add("is-" + state);
+    }
 
     const placementElement = document.getElementById("placement");
     const placementTitleElement = document.getElementById("placementTitle");
@@ -870,8 +886,7 @@
 
             connectionOpen = false;
 
-            statusElement.textContent = "Connection lost - reconnecting...";
-            statusElement.classList.remove("hidden");
+            setStatus("Connection lost - reconnecting...", "pending");
         });
 
 
@@ -879,8 +894,7 @@
 
             connectionOpen = false;
 
-            statusElement.textContent = "Opponent disconnected - game ended.";
-            statusElement.classList.remove("hidden");
+            setStatus("Opponent disconnected - game ended.", "bad");
         });
 
 
@@ -888,7 +902,7 @@
 
             console.error("Network error:", error);
 
-            statusElement.textContent = "Connection error: " + error.type;
+            setStatus("Connection error: " + error.type, "bad");
         });
     }
 
@@ -1439,6 +1453,7 @@
     function updateStatus() {
 
         let text = "";
+        let state = "pending";
 
         if (!network.connection) {
 
@@ -1456,21 +1471,35 @@
 
         } else if (phase === "PLAYING") {
 
-            text = waitingForResult
-                ? "Firing..."
-                : (currentTurn === myRole()
-                    ? "Your turn - fire at the enemy waters!"
-                    : "Opponent's turn...");
+            if (waitingForResult) {
+
+                text = "Firing...";
+
+            } else if (currentTurn === myRole()) {
+
+                text = "Your turn - fire at the enemy waters!";
+                state = "active";
+
+            } else {
+
+                text = "Opponent's turn...";
+            }
 
         } else if (phase === "GAME_OVER") {
 
-            text = winner === myRole()
-                ? "You sank their entire fleet - you win!"
-                : "Your fleet was destroyed - you lose!";
+            if (winner === myRole()) {
+
+                text = "You sank their entire fleet - you win!";
+                state = "good";
+
+            } else {
+
+                text = "Your fleet was destroyed - you lose!";
+                state = "bad";
+            }
         }
 
-        statusElement.textContent = text;
-        statusElement.classList.toggle("hidden", !text);
+        setStatus(text, state);
     }
 
 

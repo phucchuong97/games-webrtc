@@ -40,9 +40,9 @@
         }
 
         #status {
-            margin: 8px 0;
-            font-size: 17px;
-            font-weight: 600;
+            margin: 8px 0 20px;
+            display: flex;
+            justify-content: center;
         }
 
         #board {
@@ -71,6 +71,8 @@
         .cell {
             width: var(--cell-size);
             height: var(--cell-size);
+
+            border-radius: 3px;
 
             background: var(--color-bg);
 
@@ -108,7 +110,13 @@
 
 <body>
 
-<a id="backLink" class="back-link" href="../../index.html">&larr; All games</a>
+<div class="top-bar">
+
+    <a id="backLink" class="back-link" href="../../index.html">&larr; All games</a>
+
+    <span class="top-bar-title">Caro</span>
+
+</div>
 
 <p class="lead">15x15 board. First to line up 5 in a row (any direction) wins.</p>
 
@@ -120,12 +128,15 @@
 <div id="game" class="hidden">
 
     <div id="status">
-        Waiting...
+        <span id="statusPill" class="status-pill is-pending">
+            <span class="status-dot"></span>
+            <span id="statusText">Waiting...</span>
+        </span>
     </div>
 
     <div id="board"></div>
 
-    <button id="reset">
+    <button id="reset" class="btn-secondary">
         New Game
     </button>
 
@@ -286,11 +297,33 @@
     const game =
         document.getElementById("game");
 
-    const statusElement =
-        document.getElementById("status");
+    const statusPillElement =
+        document.getElementById("statusPill");
+
+    const statusTextElement =
+        document.getElementById("statusText");
 
     const boardElement =
         document.getElementById("board");
+
+
+    // =====================================================
+    // SET STATUS
+    //
+    // state is one of "pending" | "active" | "good" | "bad", driving
+    // the status pill's color (see .status-pill in theme.css).
+    // =====================================================
+
+    function setStatus(text, state = "pending") {
+
+        statusTextElement.textContent = text;
+
+        statusPillElement.classList.remove(
+            "is-pending", "is-active", "is-good", "is-bad"
+        );
+
+        statusPillElement.classList.add("is-" + state);
+    }
 
 
     // =====================================================
@@ -366,8 +399,7 @@
             "reconnecting",
             () => {
 
-                statusElement.textContent =
-                    "Connection lost - reconnecting...";
+                setStatus("Connection lost - reconnecting...", "pending");
             }
         );
 
@@ -380,8 +412,7 @@
             "close",
             () => {
 
-                statusElement.textContent =
-                    "Opponent disconnected - game ended.";
+                setStatus("Opponent disconnected - game ended.", "bad");
             }
         );
 
@@ -395,8 +426,7 @@
                     error
                 );
 
-                statusElement.textContent =
-                    "Connection error: " + error.type;
+                setStatus("Connection error: " + error.type, "bad");
             }
         );
     }
@@ -1035,8 +1065,7 @@
 
         if (!network.connection) {
 
-            statusElement.textContent =
-                "Waiting for opponent...";
+            setStatus("Waiting for opponent...", "pending");
 
             return;
         }
@@ -1044,8 +1073,7 @@
 
         if (!network.connection.open) {
 
-            statusElement.textContent =
-                "Connecting...";
+            setStatus("Connecting...", "pending");
 
             return;
         }
@@ -1057,8 +1085,7 @@
                 gameState.winner === "DRAW"
             ) {
 
-                statusElement.textContent =
-                    "Draw!";
+                setStatus("Draw!", "pending");
 
                 return;
             }
@@ -1069,13 +1096,11 @@
                 getMySymbol()
             ) {
 
-                statusElement.textContent =
-                    "You win!";
+                setStatus("You win!", "good");
 
             } else {
 
-                statusElement.textContent =
-                    "You lose!";
+                setStatus("You lose!", "bad");
             }
 
             return;
@@ -1087,13 +1112,11 @@
             getMySymbol()
         ) {
 
-            statusElement.textContent =
-                `Your turn (${getMySymbol()})`;
+            setStatus(`Your turn (${getMySymbol()})`, "active");
 
         } else {
 
-            statusElement.textContent =
-                `Opponent's turn`;
+            setStatus("Opponent's turn", "pending");
         }
     }
 
